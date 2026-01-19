@@ -1,5 +1,5 @@
 use crate::github::GitHubPR;
-use chrono::{Datelike, TimeZone, Utc};
+use chrono::{DateTime, Datelike, TimeZone, Utc};
 use serde::Serialize;
 
 #[derive(Debug, Serialize, Clone)]
@@ -15,12 +15,19 @@ pub fn calculate_metrics(
     days_to_display: i64,
     window_size: i64,
 ) -> Vec<FlowMetricsResponse> {
+    calculate_metrics_at(prs, days_to_display, window_size, Utc::now())
+}
+
+fn calculate_metrics_at(
+    prs: &[GitHubPR],
+    days_to_display: i64,
+    window_size: i64,
+    now: DateTime<Utc>,
+) -> Vec<FlowMetricsResponse> {
     let mut data = Vec::new();
-    let now = Utc::now();
 
     for i in (0..=days_to_display).rev() {
         let target_date = now - chrono::Duration::days(i);
-        // Set to end of day
         let target_date = Utc
             .with_ymd_and_hms(
                 target_date.year(),
@@ -59,4 +66,50 @@ pub fn calculate_metrics(
     }
 
     data
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::TimeZone;
+
+    #[test]
+    fn test_calculate_metrics_empty() {
+        let now = Utc.with_ymd_and_hms(2024, 1, 1, 12, 0, 0).unwrap();
+        let metrics = calculate_metrics_at(&[], 1, 30, now);
+
+        assert_eq!(metrics.len(), 2);
+        assert_eq!(metrics[0].opened, 0);
+        assert_eq!(metrics[0].merged, 0);
+        assert_eq!(metrics[0].spread, 0);
+    }
+
+    #[test]
+    fn test_calculate_metrics_with_data() {
+        let now = Utc.with_ymd_and_hms(2024, 1, 10, 12, 0, 0).unwrap();
+
+        let prs = vec![
+            GitHubPR {
+                id: 1,
+                created_at: Utc.with_ymd_and_hms(2024, 1, 5, 10, 0, 0).unwrap(),
+                merged_at: Some(Utc.with_ymd_and_hms(2024, 1, 6, 10, 0, 0).unwrap()),
+                state: "merged".to_string(),
+            },
+            GitHubPR {
+                id: 2,
+                created_at: Utc.with_ymd_and_hms(2024, 1, 9, 10, 0, 0).unwrap(),
+                merged_at: None,
+                state: "open".to_string(),
+            },
+        ];
+
+        // 30 day window ending on Jan 10
+        let metrics = calculate_metrics_at(&prs, 0, 30, now);
+
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(metrics[0].date, "2024-01-10");
+        assert_eq!(metrics[0].opened, 2);
+        assert_eq!(metrics[0].merged, 1);
+        assert_eq!(metrics[0].spread, 1);
+    }
 }
