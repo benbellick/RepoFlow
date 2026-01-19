@@ -13,6 +13,11 @@ use std::sync::Arc;
 use tower_http::services::{ServeDir, ServeFile};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+const PR_FETCH_DAYS: i64 = 90;
+const MAX_GITHUB_API_PAGES: u32 = 10;
+const METRICS_DAYS_TO_DISPLAY: i64 = 30;
+const METRICS_WINDOW_SIZE: i64 = 30;
+
 #[derive(Serialize)]
 struct HealthResponse {
     status: &'static str,
@@ -91,11 +96,11 @@ async fn get_repo_metrics(
 ) -> Result<Json<Vec<metrics::FlowMetricsResponse>>, (axum::http::StatusCode, String)> {
     let prs = state
         .github_client
-        .fetch_pull_requests(&owner, &repo, 90)
+        .fetch_pull_requests(&owner, &repo, PR_FETCH_DAYS, MAX_GITHUB_API_PAGES)
         .await
         .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    let metrics = metrics::calculate_metrics(&prs, 30, 30);
+    let metrics = metrics::calculate_metrics(&prs, METRICS_DAYS_TO_DISPLAY, METRICS_WINDOW_SIZE);
 
     Ok(Json(metrics))
 }

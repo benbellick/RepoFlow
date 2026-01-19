@@ -49,11 +49,8 @@ fn calculate_metrics_at(
         let merged_in_window = prs
             .iter()
             .filter(|pr| {
-                if let Some(merged_at) = pr.merged_at {
-                    merged_at >= window_start && merged_at <= target_date
-                } else {
-                    false
-                }
+                pr.merged_at
+                    .is_some_and(|merged_at| merged_at >= window_start && merged_at <= target_date)
             })
             .count();
 

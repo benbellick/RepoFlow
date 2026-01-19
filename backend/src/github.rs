@@ -32,7 +32,12 @@ impl GitHubClient {
         owner: &str,
         repo: &str,
         days: i64,
+        max_pages: u32,
     ) -> Result<Vec<GitHubPR>> {
+        // Sanitize inputs to prevent path traversal or unintended endpoint access
+        let owner = owner.trim().replace("..", "");
+        let repo = repo.trim().replace("..", "");
+
         let mut prs = Vec::new();
         let cutoff_date = Utc::now() - chrono::Duration::days(days);
 
@@ -54,19 +59,21 @@ impl GitHubClient {
 
             for pr in &current_page {
                 let created_at = pr.created_at.expect("PR missing created_at");
-                if created_at < cutoff_date {
-                    reached_cutoff = true;
-                }
 
-                prs.push(GitHubPR {
-                    id: pr.id.into_inner(),
-                    created_at,
-                    merged_at: pr.merged_at,
-                    state: format!("{:?}", pr.state),
-                });
+                if created_at >= cutoff_date {
+                    prs.push(GitHubPR {
+                        id: pr.id.into_inner(),
+                        created_at,
+                        merged_at: pr.merged_at,
+                        state: format!("{:?}", pr.state),
+                    });
+                } else {
+                    reached_cutoff = true;
+                    break;
+                }
             }
 
-            if reached_cutoff || page_count >= 10 {
+            if reached_cutoff || page_count >= max_pages {
                 break;
             }
 
