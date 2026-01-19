@@ -58,17 +58,28 @@ async fn health_check() -> Json<HealthResponse> {
 
 async fn shutdown_signal() {
     let ctrl_c = async {
-        tokio::signal::ctrl_c()
-            .await
-            .expect("failed to install Ctrl+C handler");
+        if tokio::signal::ctrl_c().await.is_err() {
+            tracing::error!(
+                "Failed to install Ctrl+C handler. Graceful shutdown on Ctrl+C will not work."
+            );
+            std::future::pending::<()>().await;
+        }
     };
 
     #[cfg(unix)]
     let terminate = async {
-        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-            .expect("failed to install signal handler")
-            .recv()
-            .await;
+        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+            Ok(mut stream) => {
+                stream.recv().await;
+            }
+            Err(e) => {
+                tracing::error!(
+                    "Failed to install SIGTERM handler: {}. Graceful shutdown on SIGTERM will not work.",
+                    e
+                );
+                std::future::pending::<()>().await;
+            }
+        }
     };
 
     #[cfg(not(unix))]
