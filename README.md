@@ -2,8 +2,6 @@
 
 **RepoFlow** is a tool designed to measure the "liquidity" of open source projects. It visualizes how efficiently pull requests flow through a repository by tracking the rate of incoming contributions versus the rate of merged PRs.
 
-![RepoFlow Preview](https://placehold.co/600x400?text=RepoFlow+Preview) 
-
 ## The Problem
 
 When contributing to open source, it's often hard to tell if a project is healthy and responsive or if it's drowning in a backlog. **RepoFlow** solves this by visualizing the "spread" between opened and merged PRs over time.
@@ -27,13 +25,6 @@ When contributing to open source, it's often hard to tell if a project is health
 
 ## Getting Started
 
-### Prerequisites
-
-- Node.js (v18 or higher)
-- npm
-
-### Installation
-
 1.  **Clone the repository:**
     ```bash
     git clone https://github.com/benbellick/RepoFlow.git
@@ -45,9 +36,8 @@ When contributing to open source, it's often hard to tell if a project is health
     npm install
     ```
 
-3.  **Set up Environment Variables (Optional but Recommended):**
-    To avoid GitHub API rate limits (60 requests/hour for unauthenticated users), create a `.env` file in the root directory and add your GitHub Personal Access Token:
-
+3.  **Set up Environment Variables:**
+    Create a `.env` file in the root directory to increase GitHub API rate limits:
     ```env
     VITE_GITHUB_TOKEN=your_personal_access_token_here
     ```
@@ -57,14 +47,30 @@ When contributing to open source, it's often hard to tell if a project is health
     npm run dev
     ```
 
-5.  **Open in Browser:**
-    Navigate to `http://localhost:5173` to start using RepoFlow.
+## Development
 
-## Usage
+If you are contributing to RepoFlow, here are the standard workflows:
 
-1.  Enter a GitHub repository URL (e.g., `https://github.com/facebook/react`) in the search bar.
-2.  Click **Analyze**.
-3.  View the flow metrics and charts to evaluate the project's health.
+- **Type Checking:** Ensure strict type safety.
+  ```bash
+  npx tsc
+  ```
+
+- **Linting:** Check for code style and potential errors.
+  ```bash
+  npm run lint
+  ```
+
+- **Building for Production:**
+  ```bash
+  npm run build
+  ```
+  This runs the type checker and builds the app to the `dist` folder.
+
+- **Preview Production Build:**
+  ```bash
+  npm run preview
+  ```
 
 ## License
 
