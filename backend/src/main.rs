@@ -1,8 +1,4 @@
-use axum::{
-    routing::get,
-    Router,
-    Json,
-};
+use axum::{Json, Router, routing::get};
 use serde::Serialize;
 use std::net::SocketAddr;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -26,21 +22,24 @@ async fn main() {
         .init();
 
     // Define routes
-    let app = Router::new()
-        .route("/health", get(health_check));
+    let app = Router::new().route("/health", get(health_check));
 
     // Address to bind to
     let port = std::env::var("PORT")
         .unwrap_or_else(|_| "3000".to_string())
         .parse::<u16>()
         .expect("PORT must be a valid u16");
-        
+
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     tracing::info!("Server listening on {}", addr);
 
     // Start server
-    let listener = tokio::net::TcpListener::bind(addr).await.expect("failed to bind TCP listener");
-    axum::serve(listener, app).await.expect("failed to start server");
+    let listener = tokio::net::TcpListener::bind(addr)
+        .await
+        .expect("failed to bind TCP listener");
+    axum::serve(listener, app)
+        .await
+        .expect("failed to start server");
 }
 
 async fn health_check() -> Json<HealthResponse> {
