@@ -15,22 +15,7 @@ async fn main() {
     init_tracing();
 
     let app = Router::new().route("/health", get(health_check));
-
-    let port_str = std::env::var("PORT").unwrap_or_else(|_| "3000".to_string());
-    let port = match port_str.parse::<u16>() {
-        Ok(p) => p,
-        Err(e) => {
-            tracing::error!("Invalid PORT value '{}': {}. Exiting.", port_str, e);
-            std::process::exit(1);
-        }
-    };
-
-    let addr = SocketAddr::from(([0, 0, 0, 0], port));
-    tracing::info!("Server listening on {}", addr);
-
-    let listener = tokio::net::TcpListener::bind(addr)
-        .await
-        .expect("failed to bind TCP listener");
+    let listener = get_listener().await;
 
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
@@ -46,6 +31,24 @@ fn init_tracing() {
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
+}
+
+async fn get_listener() -> tokio::net::TcpListener {
+    let port_str = std::env::var("PORT").unwrap_or_else(|_| "3000".to_string());
+    let port = match port_str.parse::<u16>() {
+        Ok(p) => p,
+        Err(e) => {
+            tracing::error!("Invalid PORT value '{}': {}. Exiting.", port_str, e);
+            std::process::exit(1);
+        }
+    };
+
+    let addr = SocketAddr::from(([0, 0, 0, 0], port));
+    tracing::info!("Server listening on {}", addr);
+
+    tokio::net::TcpListener::bind(addr)
+        .await
+        .expect("failed to bind TCP listener")
 }
 
 async fn health_check() -> Json<HealthResponse> {
