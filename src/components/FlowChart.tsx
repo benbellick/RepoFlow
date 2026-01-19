@@ -12,10 +12,18 @@ import {
 import type { FlowMetrics } from '../utils/metrics'
 import { Card } from './ui/Card'
 
+/**
+ * Props for the FlowChart component.
+ */
 interface FlowChartProps {
+  /** Array of flow metrics to visualize. */
   data: FlowMetrics[]
 }
 
+/**
+ * A line chart visualization of PR flow rates over time.
+ * Uses Recharts to display "PRs Opened" and "PRs Merged" series.
+ */
 export const FlowChart = ({ data }: FlowChartProps): JSX.Element => {
   return (
     <Card className="w-full h-[400px]">

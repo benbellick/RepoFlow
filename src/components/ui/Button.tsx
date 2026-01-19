@@ -1,13 +1,24 @@
 import type { ReactNode, JSX } from 'react'
 import { cn } from '../../utils/utils'
 
+/**
+ * Props for the Button component.
+ */
 interface ButtonProps {
+  /** The content to be rendered inside the button. */
   children: ReactNode
+  /** Optional click handler. */
   onClick?: () => void
+  /** Optional additional CSS classes. */
   className?: string
+  /** The type of the button. Defaults to "button". */
   type?: "button" | "submit"
 }
 
+/**
+ * A neo-brutalism styled button component.
+ * Features a thick border, hard shadow, and press animation.
+ */
 export const Button = ({ children, onClick, className, type = "button" }: ButtonProps): JSX.Element => (
   <button 
     type={type}

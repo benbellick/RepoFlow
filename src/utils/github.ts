@@ -1,3 +1,6 @@
+/**
+ * Represents a Pull Request object from the GitHub API.
+ */
 export interface GitHubPR {
   id: number;
   created_at: string;
@@ -7,6 +10,15 @@ export interface GitHubPR {
 
 const GITHUB_TOKEN = import.meta.env.VITE_GITHUB_TOKEN || '';
 
+/**
+ * Fetches pull requests from a specific GitHub repository.
+ * Automatically handles pagination to retrieve enough data for analysis.
+ * 
+ * @param owner - The username or organization name.
+ * @param repo - The repository name.
+ * @param days - The number of past days to fetch data for (default: 90).
+ * @returns A promise that resolves to an array of GitHubPR objects.
+ */
 export const fetchPullRequests = async (owner: string, repo: string, days: number = 90): Promise<GitHubPR[]> => {
   const prs: GitHubPR[] = [];
   let page = 1;

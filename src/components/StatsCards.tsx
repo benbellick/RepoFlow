@@ -2,14 +2,25 @@ import type { JSX } from 'react'
 import { Card } from './ui/Card'
 import { ArrowUpRight, ArrowDownRight, Minus } from 'lucide-react'
 
+/**
+ * Props for the StatCard component.
+ */
 interface StatCardProps {
+  /** The label text for the statistic (e.g., "PRs Opened"). */
   label: string
+  /** The value to display (e.g., "123" or "45%"). */
   value: string | number
+  /** The direction of the trend, if applicable. */
   trend?: 'up' | 'down' | 'neutral'
+  /** A descriptive label for the trend (e.g., "+12% vs last period"). */
   trendLabel?: string
+  /** The background color class for the card. Defaults to "bg-white". */
   color?: string
 }
 
+/**
+ * A card component designed to display a single metric with an optional trend indicator.
+ */
 export const StatCard = ({ label, value, trend, trendLabel, color = 'bg-white' }: StatCardProps): JSX.Element => {
   return (
     <Card className={color}>

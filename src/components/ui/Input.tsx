@@ -1,13 +1,24 @@
 import type { ChangeEvent, JSX } from 'react'
 import { cn } from '../../utils/utils'
 
+/**
+ * Props for the Input component.
+ */
 interface InputProps {
+  /** The current value of the input. */
   value: string
+  /** Handler for change events. */
   onChange: (e: ChangeEvent<HTMLInputElement>) => void
+  /** Optional placeholder text. */
   placeholder?: string
+  /** Optional additional CSS classes. */
   className?: string
 }
 
+/**
+ * A styled text input component.
+ * Features a thick border and distinct focus state.
+ */
 export const Input = ({ value, onChange, placeholder, className }: InputProps): JSX.Element => (
   <input
     type="text"

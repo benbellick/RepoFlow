@@ -1,5 +1,8 @@
 import type { GitHubPR } from './github';
 
+/**
+ * Represents the calculated metrics for a specific date.
+ */
 export interface FlowMetrics {
   date: string;
   opened: number;
@@ -7,6 +10,14 @@ export interface FlowMetrics {
   spread: number;
 }
 
+/**
+ * Calculates rolling window metrics from raw GitHub PR data.
+ * 
+ * @param prs - Array of raw GitHubPR objects.
+ * @param daysToDisplay - Number of days to include in the output array (default: 30).
+ * @param windowSize - The size of the rolling window in days (default: 30).
+ * @returns An array of FlowMetrics, one for each day.
+ */
 export const calculateMetrics = (
   prs: GitHubPR[], 
   daysToDisplay: number = 30, 
@@ -45,7 +56,12 @@ export const calculateMetrics = (
   return data;
 };
 
-// Keep dummy generator for fallback/loading states
+/**
+ * Generates dummy flow data for testing and preview purposes.
+ * 
+ * @param days - Number of days to generate data for (default: 30).
+ * @returns An array of dummy FlowMetrics.
+ */
 export const generateDummyData = (days: number = 30): FlowMetrics[] => {
   const data: FlowMetrics[] = [];
   const now = new Date();
