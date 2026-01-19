@@ -103,6 +103,11 @@ This will start the API server on `http://localhost:3000`. You can test it with:
 curl http://localhost:3000/health
 ```
 
+**Useful Commands:**
+- **Format:** `cargo fmt`
+- **Lint:** `cargo clippy`
+- **Test:** `cargo test`
+
 ## License
 
 MIT
