@@ -3,39 +3,44 @@ use chrono::{DateTime, Utc};
 use octocrab::Octocrab;
 use serde::{Deserialize, Serialize};
 
-/// Represents the state of a Pull Request.
+/// Represents the possible states of a GitHub Pull Request in our system.
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum PRState {
+    /// The PR is currently open and active.
     Open,
+    /// The PR has been closed without being merged.
     Closed,
+    /// The PR has been successfully merged into the target branch.
     Merged,
+    /// The state of the PR could not be determined.
     Unknown,
 }
 
-/// A simplified representation of a GitHub Pull Request for flow analysis.
+/// A simplified representation of a GitHub Pull Request used for calculating flow metrics.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GitHubPR {
-    /// Unique identifier for the PR.
+    /// The unique GitHub database ID for this pull request.
     pub id: u64,
-    /// The timestamp when the PR was created.
+    /// The exact timestamp when the pull request was first opened.
     pub created_at: DateTime<Utc>,
-    /// The timestamp when the PR was merged, if applicable.
+    /// The timestamp when the pull request was merged (None if not merged).
     pub merged_at: Option<DateTime<Utc>>,
-    /// The current state of the PR (open, closed, merged).
+    /// The current operational state of the pull request.
     pub state: PRState,
 }
 
-/// A client for interacting with the GitHub API using Octocrab.
+/// A client wrapper around `octocrab::Octocrab` for fetching repository data.
 pub struct GitHubClient {
+    /// The underlying Octocrab instance used for API requests.
     octocrab: Octocrab,
 }
 
 impl GitHubClient {
-    /// Creates a new GitHubClient.
+    /// Initializes a new GitHubClient with an optional authentication token.
     ///
     /// # Arguments
-    /// * `token` - An optional Personal Access Token for higher rate limits.
+    /// * `token` - A GitHub Personal Access Token (PAT). Recommended to avoid rate limits.
     pub fn new(token: Option<String>) -> Result<Self> {
         let mut builder = Octocrab::builder();
         if let Some(token) = token {
@@ -47,13 +52,16 @@ impl GitHubClient {
         })
     }
 
-    /// Fetches pull requests from a repository, traversing back a certain number of days.
+    /// Retrieves a list of pull requests for a specific repository.
+    ///
+    /// This method handles pagination automatically and filters PRs based on a date cutoff.
+    /// It stops fetching as soon as it encounters a PR older than the specified `days`.
     ///
     /// # Arguments
-    /// * `owner` - The owner of the repository.
-    /// * `repo` - The name of the repository.
-    /// * `days` - How many days of history to fetch.
-    /// * `max_pages` - The maximum number of API pages to fetch.
+    /// * `owner` - The GitHub username or organization (e.g., "facebook").
+    /// * `repo` - The repository name (e.g., "react").
+    /// * `days` - The number of days of history to fetch from the current time.
+    /// * `max_pages` - The maximum number of API pages to traverse (safety limit).
     pub async fn fetch_pull_requests(
         &self,
         owner: &str,
@@ -81,14 +89,12 @@ impl GitHubClient {
             let mut reached_cutoff = false;
 
             for pr in &current_page {
-                // Safely extract created_at, skipping malformed PRs.
                 let created_at = match pr.created_at {
                     Some(dt) => dt,
                     None => continue,
                 };
 
                 if created_at >= cutoff_date {
-                    // Determine state: Octocrab's `merged_at` is the source of truth for "merged".
                     let state = if pr.merged_at.is_some() {
                         PRState::Merged
                     } else {

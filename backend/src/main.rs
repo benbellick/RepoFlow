@@ -13,9 +13,13 @@ use std::sync::Arc;
 use tower_http::services::{ServeDir, ServeFile};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+/// Number of past days to fetch pull request data for from the GitHub API.
 const PR_FETCH_DAYS: i64 = 90;
+/// Hard limit on the number of paginated requests to make to the GitHub API per repository.
 const MAX_GITHUB_API_PAGES: u32 = 10;
+/// The number of individual data points (days) to return in the flow metrics response.
 const METRICS_DAYS_TO_DISPLAY: i64 = 30;
+/// The size of the trailing window (in days) used to calculate the rolling counts.
 const METRICS_WINDOW_SIZE: i64 = 30;
 
 #[derive(Serialize)]
@@ -25,7 +29,9 @@ struct HealthResponse {
     version: &'static str,
 }
 
+/// Shared application state accessible to all request handlers.
 struct AppState {
+    /// Thread-safe client for interacting with the GitHub API.
     github_client: GitHubClient,
 }
 
