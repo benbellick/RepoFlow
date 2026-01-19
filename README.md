@@ -77,6 +77,9 @@ If you are contributing to RepoFlow, here are the standard workflows:
   npm run preview
   ```
 
+### Note on Versioning
+Frontend and Backend versions are kept in sync manually. Both are currently at `0.1.0`.
+
 ## CI & Quality
 
 This project uses GitHub Actions for Continuous Integration. Every push and Pull Request to `main` triggers a workflow that performs:
