@@ -2,13 +2,25 @@
 FROM rust:1.83-slim-bookworm as builder
 
 WORKDIR /usr/src/app
-COPY . .
 
-# Build for release
+# Copy manifests first to cache dependencies
+COPY Cargo.toml Cargo.lock ./
+
+# Create a dummy project to build dependencies
+RUN mkdir src && echo "fn main() {}" > src/main.rs
 RUN cargo build --release
 
+# Remove dummy source
+RUN rm -rf src
+
+# Copy real source
+COPY src ./src
+
+# Build the application
+# Use `touch` to ensure main.rs is newer than the cached build artifact
+RUN touch src/main.rs && cargo build --release
+
 # Stage 2: Runtime
-# We use gcr.io/distroless/cc-debian12 for a tiny image that still has libc
 FROM gcr.io/distroless/cc-debian12
 
 COPY --from=builder /usr/src/app/target/release/backend /usr/local/bin/backend

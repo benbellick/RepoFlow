@@ -1,12 +1,18 @@
 use axum::{
     routing::get,
     Router,
-    response::IntoResponse,
     Json,
 };
-use serde_json::json;
+use serde::Serialize;
 use std::net::SocketAddr;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+#[derive(Serialize)]
+struct HealthResponse {
+    status: &'static str,
+    service: &'static str,
+    version: &'static str,
+}
 
 #[tokio::main]
 async fn main() {
@@ -24,18 +30,23 @@ async fn main() {
         .route("/health", get(health_check));
 
     // Address to bind to
-    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
+    let port = std::env::var("PORT")
+        .unwrap_or_else(|_| "3000".to_string())
+        .parse::<u16>()
+        .expect("PORT must be a valid u16");
+        
+    let addr = SocketAddr::from(([0, 0, 0, 0], port));
     tracing::info!("Server listening on {}", addr);
 
     // Start server
-    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-    axum::serve(listener, app).await.unwrap();
+    let listener = tokio::net::TcpListener::bind(addr).await.expect("failed to bind TCP listener");
+    axum::serve(listener, app).await.expect("failed to start server");
 }
 
-async fn health_check() -> impl IntoResponse {
-    Json(json!({
-        "status": "ok",
-        "service": "repoflow-backend",
-        "version": env!("CARGO_PKG_VERSION")
-    }))
+async fn health_check() -> Json<HealthResponse> {
+    Json(HealthResponse {
+        status: "ok",
+        service: "repoflow-backend",
+        version: env!("CARGO_PKG_VERSION"),
+    })
 }
