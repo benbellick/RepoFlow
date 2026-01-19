@@ -1,73 +1,71 @@
-# React + TypeScript + Vite
+# RepoFlow
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**RepoFlow** is a tool designed to measure the "liquidity" of open source projects. It visualizes how efficiently pull requests flow through a repository by tracking the rate of incoming contributions versus the rate of merged PRs.
 
-Currently, two official plugins are available:
+![RepoFlow Preview](https://placehold.co/600x400?text=RepoFlow+Preview) 
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## The Problem
 
-## React Compiler
+When contributing to open source, it's often hard to tell if a project is healthy and responsive or if it's drowning in a backlog. **RepoFlow** solves this by visualizing the "spread" between opened and merged PRs over time.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **Tight Spread:** The project is processing contributions efficiently (Healthy).
+- **Widening Spread:** Contributions are outpacing the maintainers' ability to review and merge (Backlog building).
 
-## Expanding the ESLint configuration
+## Features
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- **Flow Visualization:** Interactive line charts showing the volume of opened vs. merged PRs over a rolling 30-day window.
+- **Key Metrics:** Instant insights into the "Spread", Merge Rate, and volume trends.
+- **Neo-brutalism Design:** A bold, high-contrast UI built with Tailwind CSS.
+- **GitHub Integration:** Fetches real-time data directly from the GitHub public API.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## Tech Stack
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+- **Frontend:** React + TypeScript (Vite)
+- **Styling:** Tailwind CSS (Neo-brutalism aesthetic)
+- **Charts:** Recharts
+- **Icons:** Lucide React
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## Getting Started
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Prerequisites
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+- Node.js (v18 or higher)
+- npm
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+### Installation
+
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/benbellick/RepoFlow.git
+    cd RepoFlow
+    ```
+
+2.  **Install dependencies:**
+    ```bash
+    npm install
+    ```
+
+3.  **Set up Environment Variables (Optional but Recommended):**
+    To avoid GitHub API rate limits (60 requests/hour for unauthenticated users), create a `.env` file in the root directory and add your GitHub Personal Access Token:
+
+    ```env
+    VITE_GITHUB_TOKEN=your_personal_access_token_here
+    ```
+
+4.  **Run the development server:**
+    ```bash
+    npm run dev
+    ```
+
+5.  **Open in Browser:**
+    Navigate to `http://localhost:5173` to start using RepoFlow.
+
+## Usage
+
+1.  Enter a GitHub repository URL (e.g., `https://github.com/facebook/react`) in the search bar.
+2.  Click **Analyze**.
+3.  View the flow metrics and charts to evaluate the project's health.
+
+## License
+
+MIT
