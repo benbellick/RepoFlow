@@ -86,6 +86,20 @@ This project uses GitHub Actions for Continuous Integration. Every push and Pull
 - **Unit Testing:** Runs the test suite using Vitest.
 - **Build Verification:** Ensures the project can be successfully bundled for production.
 
+## Backend Development
+
+To spin up the Rust backend locally:
+
+```bash
+docker compose up
+```
+
+This will start the API server on `http://localhost:3000`. You can test it with:
+
+```bash
+curl http://localhost:3000/health
+```
+
 ## License
 
 MIT
