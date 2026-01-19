@@ -2,14 +2,25 @@ use crate::github::GitHubPR;
 use chrono::{DateTime, Datelike, TimeZone, Utc};
 use serde::Serialize;
 
+/// The public response structure for flow metrics.
 #[derive(Debug, Serialize, Clone)]
 pub struct FlowMetricsResponse {
+    /// The date for which the metrics were calculated (YYYY-MM-DD).
     pub date: String,
+    /// Number of PRs opened within the rolling window.
     pub opened: usize,
+    /// Number of PRs merged within the rolling window.
     pub merged: usize,
+    /// The difference between opened and merged PRs.
     pub spread: i64,
 }
 
+/// Calculates rolling window metrics from a list of Pull Requests.
+///
+/// # Arguments
+/// * `prs` - The list of PRs to analyze.
+/// * `days_to_display` - How many days of history to include in the response.
+/// * `window_size` - The size of the rolling window in days (e.g., 30 for a 30-day average).
 pub fn calculate_metrics(
     prs: &[GitHubPR],
     days_to_display: i64,
@@ -18,6 +29,7 @@ pub fn calculate_metrics(
     calculate_metrics_at(prs, days_to_display, window_size, Utc::now())
 }
 
+/// Internal helper to allow deterministic testing of metrics calculation.
 fn calculate_metrics_at(
     prs: &[GitHubPR],
     days_to_display: i64,
@@ -68,6 +80,7 @@ fn calculate_metrics_at(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::github::PRState;
     use chrono::TimeZone;
 
     #[test]
@@ -90,13 +103,13 @@ mod tests {
                 id: 1,
                 created_at: Utc.with_ymd_and_hms(2024, 1, 5, 10, 0, 0).unwrap(),
                 merged_at: Some(Utc.with_ymd_and_hms(2024, 1, 6, 10, 0, 0).unwrap()),
-                state: "merged".to_string(),
+                state: PRState::Merged,
             },
             GitHubPR {
                 id: 2,
                 created_at: Utc.with_ymd_and_hms(2024, 1, 9, 10, 0, 0).unwrap(),
                 merged_at: None,
-                state: "open".to_string(),
+                state: PRState::Open,
             },
         ];
 
