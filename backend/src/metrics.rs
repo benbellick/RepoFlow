@@ -2,6 +2,10 @@ use crate::github::GitHubPR;
 use chrono::{DateTime, Datelike, TimeZone, Utc};
 use serde::Serialize;
 
+const END_OF_DAY_HOUR: u32 = 23;
+const END_OF_DAY_MIN: u32 = 59;
+const END_OF_DAY_SEC: u32 = 59;
+
 /// The public response structure for flow metrics.
 #[derive(Debug, Serialize, Clone)]
 pub struct FlowMetricsResponse {
@@ -40,14 +44,15 @@ fn calculate_metrics_at(
 
     for i in (0..=days_to_display).rev() {
         let target_date = now - chrono::Duration::days(i);
+        // We set the time to the end of the day to ensure we capture all activity for that date.
         let target_date = Utc
             .with_ymd_and_hms(
                 target_date.year(),
                 target_date.month(),
                 target_date.day(),
-                23,
-                59,
-                59,
+                END_OF_DAY_HOUR,
+                END_OF_DAY_MIN,
+                END_OF_DAY_SEC,
             )
             .unwrap();
 
@@ -86,7 +91,9 @@ mod tests {
     #[test]
     fn test_calculate_metrics_empty() {
         let now = Utc.with_ymd_and_hms(2024, 1, 1, 12, 0, 0).unwrap();
-        let metrics = calculate_metrics_at(&[], 1, 30, now);
+        let days_to_display = 1;
+        let window_size = 30;
+        let metrics = calculate_metrics_at(&[], days_to_display, window_size, now);
 
         assert_eq!(metrics.len(), 2);
         assert_eq!(metrics[0].opened, 0);
@@ -113,8 +120,9 @@ mod tests {
             },
         ];
 
-        // 30 day window ending on Jan 10
-        let metrics = calculate_metrics_at(&prs, 0, 30, now);
+        let days_to_display = 0; // Only today
+        let window_size = 30; // 30 day window
+        let metrics = calculate_metrics_at(&prs, days_to_display, window_size, now);
 
         assert_eq!(metrics.len(), 1);
         assert_eq!(metrics[0].date, "2024-01-10");
