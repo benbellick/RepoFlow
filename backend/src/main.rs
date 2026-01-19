@@ -15,13 +15,12 @@ struct HealthResponse {
 async fn main() {
     init_tracing();
 
-    // Serve the "dist" directory as static files
     let serve_dir = ServeDir::new("dist")
         .not_found_service(ServeFile::new("dist/index.html"));
 
     let app = Router::new()
-        .route("/api/health", get(health_check)) // Prefix API routes
-        .fallback_service(serve_dir); // Everything else goes to frontend
+        .route("/api/health", get(health_check))
+        .fallback_service(serve_dir);
 
     let listener = get_listener().await;
 
