@@ -1,15 +1,7 @@
 import type { JSX } from 'react'
 import { Card } from './ui/Card'
 import { ArrowUpRight, ArrowDownRight, Minus } from 'lucide-react'
-
-/**
- * Represents the direction of a metric trend.
- */
-export enum TrendDirection {
-  UP = 'up',
-  DOWN = 'down',
-  NEUTRAL = 'neutral'
-}
+import { TrendDirection } from '../types'
 
 /**
  * Props for the StatCard component.
