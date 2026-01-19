@@ -61,6 +61,11 @@ If you are contributing to RepoFlow, here are the standard workflows:
   npm run lint
   ```
 
+- **Testing:** Run unit tests with Vitest.
+  ```bash
+  npm test
+  ```
+
 - **Building for Production:**
   ```bash
   npm run build
