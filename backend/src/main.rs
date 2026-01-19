@@ -15,8 +15,7 @@ struct HealthResponse {
 async fn main() {
     init_tracing();
 
-    let serve_dir = ServeDir::new("dist")
-        .not_found_service(ServeFile::new("dist/index.html"));
+    let serve_dir = ServeDir::new("dist").not_found_service(ServeFile::new("dist/index.html"));
 
     let app = Router::new()
         .route("/api/health", get(health_check))
