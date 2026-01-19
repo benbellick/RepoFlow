@@ -1,6 +1,6 @@
 use anyhow::Result;
 use chrono::{DateTime, Utc};
-use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, USER_AGENT};
+use octocrab::Octocrab;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -12,16 +12,19 @@ pub struct GitHubPR {
 }
 
 pub struct GitHubClient {
-    client: reqwest::Client,
-    token: Option<String>,
+    octocrab: Octocrab,
 }
 
 impl GitHubClient {
-    pub fn new(token: Option<String>) -> Self {
-        Self {
-            client: reqwest::Client::new(),
-            token,
+    pub fn new(token: Option<String>) -> Result<Self> {
+        let mut builder = Octocrab::builder();
+        if let Some(token) = token {
+            builder = builder.personal_token(token);
         }
+
+        Ok(Self {
+            octocrab: builder.build()?,
+        })
     }
 
     pub async fn fetch_pull_requests(
@@ -31,59 +34,49 @@ impl GitHubClient {
         days: i64,
     ) -> Result<Vec<GitHubPR>> {
         let mut prs = Vec::new();
-        let mut page = 1;
-        let per_page = 100;
         let cutoff_date = Utc::now() - chrono::Duration::days(days);
 
+        let mut current_page = self
+            .octocrab
+            .pulls(owner, repo)
+            .list()
+            .state(octocrab::params::State::All)
+            .sort(octocrab::params::pulls::Sort::Created)
+            .direction(octocrab::params::Direction::Descending)
+            .per_page(100)
+            .send()
+            .await?;
+
+        let mut page_count = 1;
+
         loop {
-            let url = format!(
-                "https://api.github.com/repos/{}/{}/pulls?state=all&sort=created&direction=desc&per_page={}&page={}",
-                owner, repo, per_page, page
-            );
-
-            let mut headers = HeaderMap::new();
-            headers.insert(USER_AGENT, HeaderValue::from_static("repoflow-backend"));
-            headers.insert(
-                "Accept",
-                HeaderValue::from_static("application/vnd.github.v3+json"),
-            );
-
-            if let Some(ref token) = self.token {
-                headers.insert(
-                    AUTHORIZATION,
-                    HeaderValue::from_str(&format!("token {}", token))?,
-                );
-            }
-
-            let response = self.client.get(&url).headers(headers).send().await?;
-
-            if !response.status().is_success() {
-                if response.status() == 403 {
-                    return Err(anyhow::anyhow!("GitHub API rate limit exceeded"));
-                }
-                return Err(anyhow::anyhow!(
-                    "Failed to fetch PRs: {}",
-                    response.status()
-                ));
-            }
-
-            let data: Vec<GitHubPR> = response.json().await?;
-            if data.is_empty() {
-                break;
-            }
-
             let mut reached_cutoff = false;
-            for pr in data {
-                if pr.created_at < cutoff_date {
+
+            for pr in &current_page {
+                let created_at = pr.created_at.expect("PR missing created_at");
+                if created_at < cutoff_date {
                     reached_cutoff = true;
                 }
-                prs.push(pr);
+
+                prs.push(GitHubPR {
+                    id: pr.id.into_inner(),
+                    created_at,
+                    merged_at: pr.merged_at,
+                    state: format!("{:?}", pr.state),
+                });
             }
 
-            if reached_cutoff || page >= 10 {
+            if reached_cutoff || page_count >= 10 {
                 break;
             }
-            page += 1;
+
+            match self.octocrab.get_page(&current_page.next).await? {
+                Some(next_page) => {
+                    current_page = next_page;
+                    page_count += 1;
+                }
+                None => break,
+            }
         }
 
         Ok(prs)

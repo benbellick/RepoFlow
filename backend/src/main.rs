@@ -30,7 +30,7 @@ async fn main() {
 
     let github_token = std::env::var("GITHUB_TOKEN").ok();
     let state = Arc::new(AppState {
-        github_client: GitHubClient::new(github_token),
+        github_client: GitHubClient::new(github_token).expect("failed to initialize GitHub client"),
     });
 
     let serve_dir = ServeDir::new("dist").not_found_service(ServeFile::new("dist/index.html"));

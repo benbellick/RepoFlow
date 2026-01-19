@@ -13,7 +13,7 @@ COPY src ./src
 RUN npm run build
 
 # Stage 2: Build Backend
-FROM rust:1.83-slim-bookworm as backend-builder
+FROM rust:1.84-slim-bookworm as backend-builder
 
 WORKDIR /usr/src/backend
 
