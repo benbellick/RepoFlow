@@ -1,8 +1,10 @@
 /**
  * Represents the direction of a metric trend.
  */
-export enum TrendDirection {
-  UP = 'up',
-  DOWN = 'down',
-  NEUTRAL = 'neutral'
-}
+export const TrendDirection = {
+  UP: 'up',
+  DOWN: 'down',
+  NEUTRAL: 'neutral'
+} as const;
+
+export type TrendDirection = (typeof TrendDirection)[keyof typeof TrendDirection];
