@@ -5,7 +5,7 @@ import type { FlowMetrics } from './utils/metrics'
 import { Input } from './components/ui/Input'
 import { Button } from './components/ui/Button'
 import { FlowChart } from './components/FlowChart'
-import { StatCard } from './components/StatsCards'
+import { StatCard, TrendDirection } from './components/StatsCards'
 import { parseGitHubUrl } from './utils/parser'
 import { fetchPullRequests } from './utils/github'
 import { Loader2, AlertCircle } from 'lucide-react'
@@ -99,7 +99,7 @@ function App(): JSX.Element {
           <StatCard 
             label="The Spread" 
             value={currentSpread} 
-            trend={isWidening ? 'up' : 'down'} 
+            trend={isWidening ? TrendDirection.UP : TrendDirection.DOWN} 
             trendLabel={isWidening ? 'Widening' : 'Tightening'}
             color="bg-main"
           />
