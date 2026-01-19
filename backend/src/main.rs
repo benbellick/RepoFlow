@@ -1,6 +1,7 @@
 use axum::{routing::get, Json, Router};
 use serde::Serialize;
 use std::net::SocketAddr;
+use tower_http::services::{ServeDir, ServeFile};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Serialize)]
@@ -14,7 +15,12 @@ struct HealthResponse {
 async fn main() {
     init_tracing();
 
-    let app = Router::new().route("/health", get(health_check));
+    let serve_dir = ServeDir::new("dist").not_found_service(ServeFile::new("dist/index.html"));
+
+    let app = Router::new()
+        .route("/api/health", get(health_check))
+        .fallback_service(serve_dir);
+
     let listener = get_listener().await;
 
     axum::serve(listener, app)
