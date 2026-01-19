@@ -31,6 +31,7 @@ pub struct GitHubPR {
 }
 
 /// A client wrapper around `octocrab::Octocrab` for fetching repository data.
+#[derive(Clone)]
 pub struct GitHubClient {
     /// The underlying Octocrab instance used for API requests.
     octocrab: Octocrab,

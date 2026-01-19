@@ -7,19 +7,15 @@ use axum::{
     Json, Router,
 };
 use github::GitHubClient;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tower_http::services::{ServeDir, ServeFile};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-/// Number of past days to fetch pull request data for from the GitHub API.
 const PR_FETCH_DAYS: i64 = 90;
-/// Hard limit on the number of paginated requests to make to the GitHub API per repository.
 const MAX_GITHUB_API_PAGES: u32 = 10;
-/// The number of individual data points (days) to return in the flow metrics response.
 const METRICS_DAYS_TO_DISPLAY: i64 = 30;
-/// The size of the trailing window (in days) used to calculate the rolling counts.
 const METRICS_WINDOW_SIZE: i64 = 30;
 
 #[derive(Serialize)]
@@ -33,6 +29,13 @@ struct HealthResponse {
 struct AppState {
     /// Thread-safe client for interacting with the GitHub API.
     github_client: GitHubClient,
+}
+
+/// Parameters extracted from the URL path /api/repos/:owner/:repo/metrics
+#[derive(Deserialize)]
+struct RepoPath {
+    owner: String,
+    repo: String,
 }
 
 #[tokio::main]
@@ -103,7 +106,7 @@ async fn health_check() -> Json<HealthResponse> {
 }
 
 async fn get_repo_metrics(
-    Path((owner, repo)): Path<(String, String)>,
+    Path(RepoPath { owner, repo }): Path<RepoPath>,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<metrics::FlowMetricsResponse>>, (axum::http::StatusCode, String)> {
     let prs = state
