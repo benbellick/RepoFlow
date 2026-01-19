@@ -1,6 +1,15 @@
-use axum::{routing::get, Json, Router};
+mod github;
+mod metrics;
+
+use axum::{
+    extract::{Path, State},
+    routing::get,
+    Json, Router,
+};
+use github::GitHubClient;
 use serde::Serialize;
 use std::net::SocketAddr;
+use std::sync::Arc;
 use tower_http::services::{ServeDir, ServeFile};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -11,15 +20,26 @@ struct HealthResponse {
     version: &'static str,
 }
 
+struct AppState {
+    github_client: GitHubClient,
+}
+
 #[tokio::main]
 async fn main() {
     init_tracing();
+
+    let github_token = std::env::var("GITHUB_TOKEN").ok();
+    let state = Arc::new(AppState {
+        github_client: GitHubClient::new(github_token),
+    });
 
     let serve_dir = ServeDir::new("dist").not_found_service(ServeFile::new("dist/index.html"));
 
     let app = Router::new()
         .route("/api/health", get(health_check))
-        .fallback_service(serve_dir);
+        .route("/api/repos/:owner/:repo/metrics", get(get_repo_metrics))
+        .fallback_service(serve_dir)
+        .with_state(state);
 
     let listener = get_listener().await;
 
@@ -63,6 +83,21 @@ async fn health_check() -> Json<HealthResponse> {
         service: "repoflow-backend",
         version: env!("CARGO_PKG_VERSION"),
     })
+}
+
+async fn get_repo_metrics(
+    Path((owner, repo)): Path<(String, String)>,
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<Vec<metrics::FlowMetricsResponse>>, (axum::http::StatusCode, String)> {
+    let prs = state
+        .github_client
+        .fetch_pull_requests(&owner, &repo, 90)
+        .await
+        .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let metrics = metrics::calculate_metrics(&prs, 30, 30);
+
+    Ok(Json(metrics))
 }
 
 async fn shutdown_signal() {
