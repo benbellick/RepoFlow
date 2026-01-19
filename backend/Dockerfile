@@ -6,7 +6,10 @@ WORKDIR /usr/src/app
 # Copy manifests first to cache dependencies
 COPY Cargo.toml Cargo.lock ./
 
-# Create a dummy project to build dependencies
+# Create a dummy project to build dependencies.
+# We do this instead of just `cargo fetch` because we want to cache the 
+# compiled results of the dependencies (which is the slowest part of the build), 
+# not just the downloaded source code.
 RUN mkdir src && echo "fn main() {}" > src/main.rs
 RUN cargo build --release
 
