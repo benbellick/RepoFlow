@@ -61,15 +61,6 @@ impl GitHubClient {
         days: i64,
         max_pages: u32,
     ) -> Result<Vec<GitHubPR>> {
-        // Validation: Reject path traversal attempts or suspicious names.
-        let owner = owner.trim();
-        let repo = repo.trim();
-        if owner.contains("..") || repo.contains("..") {
-            return Err(anyhow::anyhow!(
-                "Invalid owner or repo name: '..' is not allowed"
-            ));
-        }
-
         let mut prs = Vec::new();
         let cutoff_date = Utc::now() - chrono::Duration::days(days);
 
