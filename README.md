@@ -61,6 +61,11 @@ If you are contributing to RepoFlow, here are the standard workflows:
   npm run lint
   ```
 
+- **Testing:** Run unit tests with Vitest.
+  ```bash
+  npm test
+  ```
+
 - **Building for Production:**
   ```bash
   npm run build
@@ -71,6 +76,15 @@ If you are contributing to RepoFlow, here are the standard workflows:
   ```bash
   npm run preview
   ```
+
+## CI & Quality
+
+This project uses GitHub Actions for Continuous Integration. Every push and Pull Request to `main` triggers a workflow that performs:
+
+- **Type Checking:** Ensures 100% type safety using `tsc`.
+- **Linting:** Enforces strict code style and React best practices (fails on any warnings).
+- **Unit Testing:** Runs the test suite using Vitest.
+- **Build Verification:** Ensures the project can be successfully bundled for production.
 
 ## License
 
