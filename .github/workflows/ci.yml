@@ -64,3 +64,15 @@ jobs:
 
       - name: Build
         run: cargo build --verbose
+
+  docker:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Docker Build
+        run: docker build .
