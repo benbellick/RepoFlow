@@ -40,9 +40,15 @@ async fn main() {
     init_tracing();
 
     let github_token = std::env::var("GITHUB_TOKEN").ok();
-    let state = Arc::new(AppState {
-        github_client: GitHubClient::new(github_token).expect("failed to initialize GitHub client"),
-    });
+    let github_client = match GitHubClient::new(github_token) {
+        Ok(client) => client,
+        Err(e) => {
+            tracing::error!("Failed to initialize GitHub client: {}. Exiting.", e);
+            std::process::exit(1);
+        }
+    };
+
+    let state = Arc::new(AppState { github_client });
 
     let serve_dir = ServeDir::new("dist").not_found_service(ServeFile::new("dist/index.html"));
 
@@ -104,7 +110,13 @@ async fn get_repo_metrics(
         .github_client
         .fetch_pull_requests(&owner, &repo, PR_FETCH_DAYS, MAX_GITHUB_API_PAGES)
         .await
-        .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .map_err(|e| {
+            tracing::error!("Failed to fetch PRs for {}/{}: {}", owner, repo, e);
+            (
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                "Internal Server Error".to_string(),
+            )
+        })?;
 
     let metrics = metrics::calculate_metrics(&prs, METRICS_DAYS_TO_DISPLAY, METRICS_WINDOW_SIZE);
 
