@@ -14,6 +14,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration as StdDuration;
 use tower_http::services::{ServeDir, ServeFile};
+use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 /// Number of past days to fetch pull request data for from the GitHub API.
@@ -82,6 +83,7 @@ async fn main() {
         .route("/api/health", get(health_check))
         .route("/api/repos/:owner/:repo/metrics", get(get_repo_metrics))
         .fallback_service(serve_dir)
+        .layer(TraceLayer::new_for_http())
         .with_state(state);
 
     let listener = get_listener().await;
