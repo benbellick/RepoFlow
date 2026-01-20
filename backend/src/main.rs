@@ -81,7 +81,7 @@ async fn main() {
 
     let app = Router::new()
         .route("/api/health", get(health_check))
-        .route("/api/repos/:owner/:repo/metrics", get(get_repo_metrics))
+        .route("/api/repos/{owner}/{repo}/metrics", get(get_repo_metrics))
         .fallback_service(serve_dir)
         .layer(TraceLayer::new_for_http())
         .with_state(state);
