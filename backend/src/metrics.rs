@@ -43,43 +43,52 @@ fn calculate_metrics_at(
     let mut data = Vec::new();
 
     for i in (0..=days_to_display).rev() {
-        let target_date = now - chrono::Duration::days(i);
+        let date = now - chrono::Duration::days(i);
         // We set the time to the end of the day to ensure we capture all activity for that date.
         let target_date = Utc
             .with_ymd_and_hms(
-                target_date.year(),
-                target_date.month(),
-                target_date.day(),
+                date.year(),
+                date.month(),
+                date.day(),
                 END_OF_DAY_HOUR,
                 END_OF_DAY_MIN,
                 END_OF_DAY_SEC,
             )
             .unwrap();
 
-        let window_start = target_date - chrono::Duration::days(window_size);
-
-        let opened_in_window = prs
-            .iter()
-            .filter(|pr| pr.created_at >= window_start && pr.created_at <= target_date)
-            .count();
-
-        let merged_in_window = prs
-            .iter()
-            .filter(|pr| {
-                pr.merged_at
-                    .is_some_and(|merged_at| merged_at >= window_start && merged_at <= target_date)
-            })
-            .count();
-
-        data.push(FlowMetricsResponse {
-            date: target_date.format("%Y-%m-%d").to_string(),
-            opened: opened_in_window,
-            merged: merged_in_window,
-            spread: opened_in_window as i64 - merged_in_window as i64,
-        });
+        data.push(calculate_day_metrics(prs, target_date, window_size));
     }
 
     data
+}
+
+/// Calculates opened and merged metrics for a single point in time using a rolling window.
+fn calculate_day_metrics(
+    prs: &[GitHubPR],
+    target_date: DateTime<Utc>,
+    window_size: i64,
+) -> FlowMetricsResponse {
+    let window_start = target_date - chrono::Duration::days(window_size);
+
+    let opened = prs
+        .iter()
+        .filter(|pr| pr.created_at >= window_start && pr.created_at <= target_date)
+        .count();
+
+    let merged = prs
+        .iter()
+        .filter(|pr| {
+            pr.merged_at
+                .is_some_and(|merged_at| merged_at >= window_start && merged_at <= target_date)
+        })
+        .count();
+
+    FlowMetricsResponse {
+        date: target_date.format("%Y-%m-%d").to_string(),
+        opened,
+        merged,
+        spread: opened as i64 - merged as i64,
+    }
 }
 
 #[cfg(test)]
