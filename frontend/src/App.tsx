@@ -57,10 +57,8 @@ function App(): JSX.Element {
   const prevSpread = data.length > 1 ? data[data.length - 2].spread : currentSpread
   const isWidening = currentSpread > prevSpread
 
-  // Check if data is empty (all zeros)
-  // We check if the sum of all opened and merged PRs across the period is 0
   const hasData = data.some(day => day.opened > 0 || day.merged > 0)
-  
+
   return (
     <div className="min-h-screen bg-bg p-8 font-sans selection:bg-main">
       <header className="max-w-7xl mx-auto mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
@@ -90,45 +88,43 @@ function App(): JSX.Element {
           </div>
         )}
 
-        {hasData ? (
-          <>
-            <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 transition-opacity duration-300 ${loading ? 'opacity-50' : 'opacity-100'}`}>
-              <StatCard
-                label="PRs Opened (30d)"
-                value={currentOpened}
-                color="bg-white"
-              />
-              <StatCard
-                label="PRs Merged (30d)"
-                value={currentMerged}
-                color="bg-white"
-              />
-              <StatCard
-                label="The Spread"
-                value={currentSpread}
-                trend={isWidening ? TrendDirection.UP : TrendDirection.DOWN}
-                trendLabel={isWidening ? 'Widening' : 'Tightening'}
-                color="bg-main"
-              />
-              <StatCard
-                label="Merge Rate"
-                value={`${mergeRate}%`}
-                color="bg-white"
-              />
-            </div>
+        <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 transition-opacity duration-300 ${loading ? 'opacity-50' : 'opacity-100'}`}>
+          <StatCard
+            label="PRs Opened (30d)"
+            value={currentOpened}
+            color="bg-white"
+          />
+          <StatCard
+            label="PRs Merged (30d)"
+            value={currentMerged}
+            color="bg-white"
+          />
+          <StatCard
+            label="The Spread"
+            value={currentSpread}
+            trend={isWidening ? TrendDirection.UP : TrendDirection.DOWN}
+            trendLabel={isWidening ? 'Widening' : 'Tightening'}
+            color="bg-main"
+          />
+          <StatCard
+            label="Merge Rate"
+            value={`${mergeRate}%`}
+            color="bg-white"
+          />
+        </div>
 
-            <div className={`transition-opacity duration-300 ${loading ? 'opacity-50' : 'opacity-100'}`}>
-              <FlowChart data={data} />
+        <div className={`transition-opacity duration-300 ${loading ? 'opacity-50' : 'opacity-100'}`}>
+          {hasData ? (
+            <FlowChart data={data} />
+          ) : (
+            <div className="border-4 border-black bg-white p-12 text-center shadow-base">
+              <h2 className="text-3xl font-heading mb-4">No Data Found</h2>
+              <p className="text-xl font-base text-gray-600">
+                We couldn't find any pull requests for this repository in the analyzed time period.
+              </p>
             </div>
-          </>
-        ) : (
-          <div className="border-4 border-black bg-white p-12 text-center shadow-base">
-            <h2 className="text-3xl font-heading mb-4">No Data Found</h2>
-            <p className="text-xl font-base text-gray-600">
-              We couldn't find any pull requests for this repository in the analyzed time period.
-            </p>
-          </div>
-        )}
+          )}
+        </div>
       </main>
 
       <footer className="max-w-7xl mx-auto mt-12 pt-8 border-t-4 border-black font-base flex justify-between items-center">
