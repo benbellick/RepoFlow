@@ -102,7 +102,8 @@ impl GitHubClient {
                         match pr.state {
                             Some(octocrab::models::IssueState::Open) => PRState::Open,
                             Some(octocrab::models::IssueState::Closed) => PRState::Closed,
-                            _ => PRState::Unknown,
+                            Some(_) => PRState::Unknown,
+                            None => PRState::Unknown,
                         }
                     };
 
