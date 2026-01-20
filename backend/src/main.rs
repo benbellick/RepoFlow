@@ -24,8 +24,10 @@ const MAX_GITHUB_API_PAGES: u32 = 10;
 const METRICS_DAYS_TO_DISPLAY: i64 = 30;
 /// The size of the trailing window (in days) used to calculate the rolling counts.
 const METRICS_WINDOW_SIZE: i64 = 30;
-/// Time to live for cached repository metrics.
-const CACHE_TTL_SECONDS: u64 = 3600;
+/// Time to live for cached repository metrics (24 hours).
+/// Note: This long TTL reduces GitHub API load but may result in stale data.
+/// TODO(#15): Implement a more sophisticated cache invalidation or background refresh strategy.
+const CACHE_TTL_SECONDS: u64 = 86400;
 /// Maximum number of entries to keep in the metrics cache.
 const CACHE_MAX_CAPACITY: u64 = 1000;
 
