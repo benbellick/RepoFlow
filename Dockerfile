@@ -2,13 +2,14 @@
 FROM node:20-slim as frontend-builder
 
 WORKDIR /usr/src/frontend
-COPY package.json package-lock.json ./
+# Copy manifests first to cache dependencies
+COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 
 # Copy only necessary frontend files
-COPY tsconfig.json tsconfig.app.json tsconfig.node.json vite.config.ts index.html tailwind.config.js postcss.config.js ./
-COPY public ./public
-COPY src ./src
+COPY frontend/tsconfig.json frontend/tsconfig.app.json frontend/tsconfig.node.json frontend/vite.config.ts frontend/index.html frontend/tailwind.config.js frontend/postcss.config.js ./
+COPY frontend/public ./public
+COPY frontend/src ./src
 
 RUN npm run build
 
@@ -20,10 +21,8 @@ WORKDIR /usr/src/backend
 # Copy manifests first to cache dependencies
 COPY backend/Cargo.toml backend/Cargo.lock ./
 
-# Create a dummy project to build dependencies.
-# We do this instead of just `cargo fetch` because we want to cache the 
-# compiled results of the dependencies (which is the slowest part of the build), 
-# not just the downloaded source code.
+# Create a dummy project to build and cache compiled dependencies.
+# This is more effective than `cargo fetch` as it caches compiled artifacts.
 RUN mkdir src && echo "fn main() {}" > src/main.rs
 RUN cargo build --release
 
@@ -33,8 +32,8 @@ RUN rm -rf src
 # Copy real source
 COPY backend/src ./src
 
-# Build the application
-# Use `touch` to ensure main.rs is newer than the cached build artifact
+# Build the application. Use `touch` to ensure main.rs is newer than 
+# cached artifacts, forcing a recompile of the application crate.
 RUN touch src/main.rs && cargo build --release
 
 # Stage 3: Runtime
