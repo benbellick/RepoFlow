@@ -1,4 +1,4 @@
-# Gemini Interaction Guidelines
+# AI Agent Interaction Guidelines
 
 - **Never merge Pull Requests.** Always ask the user to merge manually or confirm explicitly before taking any action that modifies the upstream repository state via merge.
 - **Verify CI Locally.** Before pushing changes, ALWAYS verify that the build, linter, tests, and formatter pass locally.

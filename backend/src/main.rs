@@ -1,8 +1,27 @@
-use axum::{routing::get, Json, Router};
-use serde::Serialize;
+mod github;
+mod metrics;
+
+use axum::{
+    extract::{Path, State},
+    routing::get,
+    Json, Router,
+};
+use chrono::{Duration, Utc};
+use github::GitHubClient;
+use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
+use std::sync::Arc;
 use tower_http::services::{ServeDir, ServeFile};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+/// Number of past days to fetch pull request data for from the GitHub API.
+const PR_FETCH_DAYS: i64 = 90;
+/// Hard limit on the number of paginated requests to make to the GitHub API per repository.
+const MAX_GITHUB_API_PAGES: u32 = 10;
+/// The number of individual data points (days) to return in the flow metrics response.
+const METRICS_DAYS_TO_DISPLAY: i64 = 30;
+/// The size of the trailing window (in days) used to calculate the rolling counts.
+const METRICS_WINDOW_SIZE: i64 = 30;
 
 #[derive(Serialize)]
 struct HealthResponse {
@@ -11,15 +30,41 @@ struct HealthResponse {
     version: &'static str,
 }
 
+/// Shared application state accessible to all request handlers.
+struct AppState {
+    /// Thread-safe client for interacting with the GitHub API.
+    github_client: GitHubClient,
+}
+
+/// Parameters extracted from the URL path /api/repos/:owner/:repo/metrics
+#[derive(Deserialize)]
+struct RepoPath {
+    owner: String,
+    repo: String,
+}
+
 #[tokio::main]
 async fn main() {
     init_tracing();
+
+    let github_token = std::env::var("GITHUB_TOKEN").ok();
+    let github_client = match GitHubClient::new(github_token) {
+        Ok(client) => client,
+        Err(e) => {
+            tracing::error!("Failed to initialize GitHub client: {}. Exiting.", e);
+            std::process::exit(1);
+        }
+    };
+
+    let state = Arc::new(AppState { github_client });
 
     let serve_dir = ServeDir::new("dist").not_found_service(ServeFile::new("dist/index.html"));
 
     let app = Router::new()
         .route("/api/health", get(health_check))
-        .fallback_service(serve_dir);
+        .route("/api/repos/:owner/:repo/metrics", get(get_repo_metrics))
+        .fallback_service(serve_dir)
+        .with_state(state);
 
     let listener = get_listener().await;
 
@@ -63,6 +108,32 @@ async fn health_check() -> Json<HealthResponse> {
         service: "repoflow-backend",
         version: env!("CARGO_PKG_VERSION"),
     })
+}
+
+async fn get_repo_metrics(
+    Path(RepoPath { owner, repo }): Path<RepoPath>,
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<Vec<metrics::FlowMetricsResponse>>, (axum::http::StatusCode, String)> {
+    let prs = state
+        .github_client
+        .fetch_pull_requests(&owner, &repo, PR_FETCH_DAYS, MAX_GITHUB_API_PAGES)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to fetch PRs for {}/{}: {}", owner, repo, e);
+            (
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                "Internal Server Error".to_string(),
+            )
+        })?;
+
+    let metrics = metrics::calculate_metrics(
+        &prs,
+        Duration::days(METRICS_DAYS_TO_DISPLAY),
+        Duration::days(METRICS_WINDOW_SIZE),
+        Utc::now(),
+    );
+
+    Ok(Json(metrics))
 }
 
 async fn shutdown_signal() {
