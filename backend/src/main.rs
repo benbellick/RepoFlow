@@ -26,6 +26,8 @@ const METRICS_DAYS_TO_DISPLAY: i64 = 30;
 const METRICS_WINDOW_SIZE: i64 = 30;
 /// Time to live for cached repository metrics.
 const CACHE_TTL_SECONDS: u64 = 3600;
+/// Maximum number of entries to keep in the metrics cache.
+const CACHE_MAX_CAPACITY: u64 = 1000;
 
 #[derive(Serialize)]
 struct HealthResponse {
@@ -39,7 +41,8 @@ struct AppState {
     /// Thread-safe client for interacting with the GitHub API.
     github_client: GitHubClient,
     /// In-memory cache for repository metrics to avoid redundant API calls and processing.
-    metrics_cache: Cache<String, Vec<metrics::FlowMetricsResponse>>,
+    /// Uses Arc to avoid cloning the entire vector on every cache hit.
+    metrics_cache: Cache<String, Arc<Vec<metrics::FlowMetricsResponse>>>,
 }
 
 /// Parameters extracted from the URL path /api/repos/:owner/:repo/metrics
@@ -63,6 +66,7 @@ async fn main() {
     };
 
     let metrics_cache = Cache::builder()
+        .max_capacity(CACHE_MAX_CAPACITY)
         .time_to_live(StdDuration::from_secs(CACHE_TTL_SECONDS))
         .build();
 
@@ -126,7 +130,7 @@ async fn health_check() -> Json<HealthResponse> {
 async fn get_repo_metrics(
     Path(RepoPath { owner, repo }): Path<RepoPath>,
     State(state): State<Arc<AppState>>,
-) -> Result<Json<Vec<metrics::FlowMetricsResponse>>, (axum::http::StatusCode, String)> {
+) -> Result<Json<Arc<Vec<metrics::FlowMetricsResponse>>>, (axum::http::StatusCode, String)> {
     let cache_key = get_cache_key(&owner, &repo);
 
     if let Some(cached_metrics) = state.metrics_cache.get(&cache_key).await {
@@ -153,13 +157,18 @@ async fn get_repo_metrics(
         Utc::now(),
     );
 
-    state.metrics_cache.insert(cache_key, metrics.clone()).await;
+    let metrics_arc = Arc::new(metrics);
 
-    Ok(Json(metrics))
+    state
+        .metrics_cache
+        .insert(cache_key, Arc::clone(&metrics_arc))
+        .await;
+
+    Ok(Json(metrics_arc))
 }
 
 fn get_cache_key(owner: &str, repo: &str) -> String {
-    format!("{}/{}", owner, repo)
+    format!("owner::{}/repo::{}", owner, repo)
 }
 
 async fn shutdown_signal() {
