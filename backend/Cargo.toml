@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-axum = "0.8.8"
+axum = { version = "0.8.8", features = ["macros"] }
 tokio = { version = "1.49.0", features = ["rt-multi-thread", "macros", "net", "signal"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
@@ -14,3 +14,4 @@ tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
 chrono = { version = "0.4.43", features = ["serde"] }
 anyhow = "1.0.100"
 octocrab = "0.40.0"
+moka = { version = "0.12.12", features = ["future"] }

@@ -8,9 +8,11 @@ use axum::{
 };
 use chrono::{Duration, Utc};
 use github::GitHubClient;
+use moka::future::Cache;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::time::Duration as StdDuration;
 use tower_http::services::{ServeDir, ServeFile};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -22,6 +24,12 @@ const MAX_GITHUB_API_PAGES: u32 = 10;
 const METRICS_DAYS_TO_DISPLAY: i64 = 30;
 /// The size of the trailing window (in days) used to calculate the rolling counts.
 const METRICS_WINDOW_SIZE: i64 = 30;
+/// Time to live for cached repository metrics (24 hours).
+/// Note: This long TTL reduces GitHub API load but may result in stale data.
+/// TODO(#15): Implement a more sophisticated cache invalidation or background refresh strategy.
+const CACHE_TTL: StdDuration = StdDuration::from_secs(86400);
+/// Maximum number of entries to keep in the metrics cache.
+const CACHE_MAX_CAPACITY: u64 = 1000;
 
 #[derive(Serialize)]
 struct HealthResponse {
@@ -34,6 +42,8 @@ struct HealthResponse {
 struct AppState {
     /// Thread-safe client for interacting with the GitHub API.
     github_client: GitHubClient,
+    /// In-memory cache for repository metrics to avoid redundant API calls and processing.
+    metrics_cache: Cache<String, Vec<metrics::FlowMetricsResponse>>,
 }
 
 /// Parameters extracted from the URL path /api/repos/:owner/:repo/metrics
@@ -56,7 +66,15 @@ async fn main() {
         }
     };
 
-    let state = Arc::new(AppState { github_client });
+    let metrics_cache = Cache::builder()
+        .max_capacity(CACHE_MAX_CAPACITY)
+        .time_to_live(CACHE_TTL)
+        .build();
+
+    let state = Arc::new(AppState {
+        github_client,
+        metrics_cache,
+    });
 
     let serve_dir = ServeDir::new("dist").not_found_service(ServeFile::new("dist/index.html"));
 
@@ -114,6 +132,13 @@ async fn get_repo_metrics(
     Path(RepoPath { owner, repo }): Path<RepoPath>,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<metrics::FlowMetricsResponse>>, (axum::http::StatusCode, String)> {
+    let cache_key = get_cache_key(&owner, &repo);
+
+    if let Some(cached_metrics) = state.metrics_cache.get(&cache_key).await {
+        tracing::debug!(owner = %owner, repo = %repo, "Returning cached metrics");
+        return Ok(Json(cached_metrics));
+    }
+
     let prs = state
         .github_client
         .fetch_pull_requests(&owner, &repo, PR_FETCH_DAYS, MAX_GITHUB_API_PAGES)
@@ -133,7 +158,13 @@ async fn get_repo_metrics(
         Utc::now(),
     );
 
+    state.metrics_cache.insert(cache_key, metrics.clone()).await;
+
     Ok(Json(metrics))
+}
+
+fn get_cache_key(owner: &str, repo: &str) -> String {
+    format!("owner::{}/repo::{}", owner, repo)
 }
 
 async fn shutdown_signal() {
