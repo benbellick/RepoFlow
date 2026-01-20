@@ -21,7 +21,8 @@ WORKDIR /usr/src/backend
 # Copy manifests first to cache dependencies
 COPY backend/Cargo.toml backend/Cargo.lock ./
 
-# Create a dummy project to build dependencies.
+# Create a dummy project to build and cache compiled dependencies.
+# This is more effective than `cargo fetch` as it caches compiled artifacts.
 RUN mkdir src && echo "fn main() {}" > src/main.rs
 RUN cargo build --release
 
@@ -31,7 +32,8 @@ RUN rm -rf src
 # Copy real source
 COPY backend/src ./src
 
-# Build the application
+# Build the application. Use `touch` to ensure main.rs is newer than 
+# cached artifacts, forcing a recompile of the application crate.
 RUN touch src/main.rs && cargo build --release
 
 # Stage 3: Runtime
