@@ -6,7 +6,7 @@ use axum::{
     routing::get,
     Json, Router,
 };
-use chrono::Duration;
+use chrono::{Duration, Utc};
 use github::GitHubClient;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
@@ -130,6 +130,7 @@ async fn get_repo_metrics(
         &prs,
         Duration::days(METRICS_DAYS_TO_DISPLAY),
         Duration::days(METRICS_WINDOW_SIZE),
+        Utc::now(),
     );
 
     Ok(Json(metrics))

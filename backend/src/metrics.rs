@@ -25,16 +25,8 @@ pub struct FlowMetricsResponse {
 /// * `prs` - The list of PRs to analyze.
 /// * `days_to_display` - How many days of history to include in the response.
 /// * `window_size` - The size of the rolling window (e.g., 30 days).
+/// * `now` - The current time used as the reference point for calculations.
 pub fn calculate_metrics(
-    prs: &[GitHubPR],
-    days_to_display: Duration,
-    window_size: Duration,
-) -> Vec<FlowMetricsResponse> {
-    calculate_metrics_at(prs, days_to_display, window_size, Utc::now())
-}
-
-/// Internal helper to allow deterministic testing of metrics calculation.
-fn calculate_metrics_at(
     prs: &[GitHubPR],
     days_to_display: Duration,
     window_size: Duration,
@@ -101,7 +93,7 @@ mod tests {
         let now = Utc.with_ymd_and_hms(2024, 1, 1, 12, 0, 0).unwrap();
         let days_to_display = Duration::days(1);
         let window_size = Duration::days(30);
-        let metrics = calculate_metrics_at(&[], days_to_display, window_size, now);
+        let metrics = calculate_metrics(&[], days_to_display, window_size, now);
 
         assert_eq!(metrics.len(), 2);
         assert_eq!(metrics[0].opened, 0);
@@ -130,7 +122,7 @@ mod tests {
 
         let days_to_display = Duration::days(0); // Only today
         let window_size = Duration::days(30); // 30 day window
-        let metrics = calculate_metrics_at(&prs, days_to_display, window_size, now);
+        let metrics = calculate_metrics(&prs, days_to_display, window_size, now);
 
         assert_eq!(metrics.len(), 1);
         assert_eq!(metrics[0].date, "2024-01-10");
