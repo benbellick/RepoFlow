@@ -8,7 +8,7 @@ import type { RepoMetricsResponse } from '../types';
  * @returns A promise that resolves to a RepoMetricsResponse object.
  */
 export const fetchRepoMetrics = async (owner: string, repo: string): Promise<RepoMetricsResponse> => {
-  const response = await fetch(`/api/repos/${owner}/${repo}/metrics`);
+  const response = await fetch(`/api/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/metrics`);
 
   if (!response.ok) {
     if (response.status === 404) {

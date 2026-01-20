@@ -26,7 +26,7 @@ pub struct SummaryMetrics {
 }
 
 /// A single data point in the flow metrics time series.
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Clone, Default)]
 pub struct FlowMetricsResponse {
     /// The date for which the metrics were calculated (YYYY-MM-DD).
     pub date: String,
@@ -81,18 +81,8 @@ pub fn calculate_metrics(
 
 /// Calculates the summary metrics based on the generated time series.
 fn calculate_summary(time_series: &[FlowMetricsResponse]) -> SummaryMetrics {
-    let latest = time_series.last().cloned().unwrap_or(FlowMetricsResponse {
-        date: "".to_string(),
-        opened: 0,
-        merged: 0,
-        spread: 0,
-    });
-
-    let previous = if time_series.len() > 1 {
-        time_series.get(time_series.len() - 2)
-    } else {
-        None
-    };
+    let latest = time_series.last().cloned().unwrap_or_default();
+    let previous = time_series.iter().rev().nth(1);
 
     let merge_rate = if latest.opened > 0 {
         ((latest.merged as f64 / latest.opened as f64) * 100.0).round() as u32
