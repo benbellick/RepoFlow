@@ -71,8 +71,8 @@ impl GitHubClient {
         days: i64,
         max_pages: u32,
     ) -> Result<Vec<GitHubPR>> {
-        let mut prs = Vec::new();
         let cutoff_date = Utc::now() - chrono::Duration::days(days);
+        let mut prs = Vec::new();
 
         let mut current_page = self
             .octocrab
@@ -85,64 +85,53 @@ impl GitHubClient {
             .send()
             .await?;
 
-        let mut page_count = 1;
+        for _ in 1..=max_pages {
+            let page_prs = self.process_pr_page(&current_page);
+            prs.extend(page_prs);
 
-        loop {
-            let reached_cutoff = self.process_pr_page(&current_page, cutoff_date, &mut prs);
-
-            if reached_cutoff || page_count >= max_pages {
+            // If the last PR we just added is older than the cutoff, we can stop.
+            if prs.last().is_some_and(|pr| pr.created_at < cutoff_date) {
                 break;
             }
 
-            match self.octocrab.get_page(&current_page.next).await? {
-                Some(next_page) => {
-                    current_page = next_page;
-                    page_count += 1;
-                }
-                None => break,
+            if let Some(next_page) = self.octocrab.get_page(&current_page.next).await? {
+                current_page = next_page;
+            } else {
+                break;
             }
         }
+
+        // Clean up: remove any PRs that were in the last page but beyond the cutoff.
+        prs.retain(|pr| pr.created_at >= cutoff_date);
 
         Ok(prs)
     }
 
-    /// Processes a single page of Pull Requests, converting them and checking for the cutoff date.
-    ///
-    /// Returns `true` if a PR older than the cutoff date was found (meaning we should stop fetching).
-    fn process_pr_page(
-        &self,
-        page: &Page<PullRequest>,
-        cutoff_date: DateTime<Utc>,
-        prs: &mut Vec<GitHubPR>,
-    ) -> bool {
-        for pr in &page.items {
-            let created_at = match pr.created_at {
-                Some(dt) => dt,
-                None => continue,
-            };
+    /// Processes a single page of Pull Requests, converting them to our internal type.
+    fn process_pr_page(&self, page: &Page<PullRequest>) -> Vec<GitHubPR> {
+        page.items
+            .iter()
+            .filter_map(|pr| {
+                let created_at = pr.created_at?;
 
-            if created_at < cutoff_date {
-                return true;
-            }
+                let state = if pr.merged_at.is_some() {
+                    PRState::Merged
+                } else {
+                    match pr.state {
+                        Some(octocrab::models::IssueState::Open) => PRState::Open,
+                        Some(octocrab::models::IssueState::Closed) => PRState::Closed,
+                        Some(_) => PRState::Unknown,
+                        None => PRState::Unknown,
+                    }
+                };
 
-            let state = if pr.merged_at.is_some() {
-                PRState::Merged
-            } else {
-                match pr.state {
-                    Some(octocrab::models::IssueState::Open) => PRState::Open,
-                    Some(octocrab::models::IssueState::Closed) => PRState::Closed,
-                    Some(_) => PRState::Unknown,
-                    None => PRState::Unknown,
-                }
-            };
-
-            prs.push(GitHubPR {
-                id: pr.id.into_inner(),
-                created_at,
-                merged_at: pr.merged_at,
-                state,
-            });
-        }
-        false
+                Some(GitHubPR {
+                    id: pr.id.into_inner(),
+                    created_at,
+                    merged_at: pr.merged_at,
+                    state,
+                })
+            })
+            .collect()
     }
 }
