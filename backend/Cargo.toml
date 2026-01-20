@@ -14,3 +14,4 @@ tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
 chrono = { version = "0.4.43", features = ["serde"] }
 anyhow = "1.0.100"
 octocrab = "0.40.0"
+moka = { version = "0.12.12", features = ["future"] }
