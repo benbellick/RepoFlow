@@ -100,7 +100,7 @@ fn calculate_summary(time_series: &[FlowMetricsResponse]) -> SummaryMetrics {
         0
     };
 
-    let is_widening = previous.map_or(false, |p| latest.spread > p.spread);
+    let is_widening = previous.is_some_and(|p| latest.spread > p.spread);
 
     SummaryMetrics {
         current_opened: latest.opened,
