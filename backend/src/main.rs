@@ -6,6 +6,7 @@ use axum::{
     routing::get,
     Json, Router,
 };
+use chrono::Duration;
 use github::GitHubClient;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
@@ -13,9 +14,13 @@ use std::sync::Arc;
 use tower_http::services::{ServeDir, ServeFile};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+/// Number of past days to fetch pull request data for from the GitHub API.
 const PR_FETCH_DAYS: i64 = 90;
+/// Hard limit on the number of paginated requests to make to the GitHub API per repository.
 const MAX_GITHUB_API_PAGES: u32 = 10;
+/// The number of individual data points (days) to return in the flow metrics response.
 const METRICS_DAYS_TO_DISPLAY: i64 = 30;
+/// The size of the trailing window (in days) used to calculate the rolling counts.
 const METRICS_WINDOW_SIZE: i64 = 30;
 
 #[derive(Serialize)]
@@ -121,7 +126,11 @@ async fn get_repo_metrics(
             )
         })?;
 
-    let metrics = metrics::calculate_metrics(&prs, METRICS_DAYS_TO_DISPLAY, METRICS_WINDOW_SIZE);
+    let metrics = metrics::calculate_metrics(
+        &prs,
+        Duration::days(METRICS_DAYS_TO_DISPLAY),
+        Duration::days(METRICS_WINDOW_SIZE),
+    );
 
     Ok(Json(metrics))
 }

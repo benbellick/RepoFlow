@@ -1,5 +1,5 @@
 use crate::github::GitHubPR;
-use chrono::{DateTime, Datelike, TimeZone, Utc};
+use chrono::{DateTime, Datelike, Duration, TimeZone, Utc};
 use serde::Serialize;
 
 const END_OF_DAY_HOUR: u32 = 23;
@@ -24,11 +24,11 @@ pub struct FlowMetricsResponse {
 /// # Arguments
 /// * `prs` - The list of PRs to analyze.
 /// * `days_to_display` - How many days of history to include in the response.
-/// * `window_size` - The size of the rolling window in days (e.g., 30 for a 30-day average).
+/// * `window_size` - The size of the rolling window (e.g., 30 days).
 pub fn calculate_metrics(
     prs: &[GitHubPR],
-    days_to_display: i64,
-    window_size: i64,
+    days_to_display: Duration,
+    window_size: Duration,
 ) -> Vec<FlowMetricsResponse> {
     calculate_metrics_at(prs, days_to_display, window_size, Utc::now())
 }
@@ -36,39 +36,38 @@ pub fn calculate_metrics(
 /// Internal helper to allow deterministic testing of metrics calculation.
 fn calculate_metrics_at(
     prs: &[GitHubPR],
-    days_to_display: i64,
-    window_size: i64,
+    days_to_display: Duration,
+    window_size: Duration,
     now: DateTime<Utc>,
 ) -> Vec<FlowMetricsResponse> {
-    let mut data = Vec::new();
+    (0..=days_to_display.num_days())
+        .rev()
+        .map(|i| {
+            let date = now - Duration::days(i);
+            // We set the time to the end of the day to ensure we capture all activity for that date.
+            let target_date = Utc
+                .with_ymd_and_hms(
+                    date.year(),
+                    date.month(),
+                    date.day(),
+                    END_OF_DAY_HOUR,
+                    END_OF_DAY_MIN,
+                    END_OF_DAY_SEC,
+                )
+                .unwrap();
 
-    for i in (0..=days_to_display).rev() {
-        let date = now - chrono::Duration::days(i);
-        // We set the time to the end of the day to ensure we capture all activity for that date.
-        let target_date = Utc
-            .with_ymd_and_hms(
-                date.year(),
-                date.month(),
-                date.day(),
-                END_OF_DAY_HOUR,
-                END_OF_DAY_MIN,
-                END_OF_DAY_SEC,
-            )
-            .unwrap();
-
-        data.push(calculate_day_metrics(prs, target_date, window_size));
-    }
-
-    data
+            calculate_day_metrics(prs, target_date, window_size)
+        })
+        .collect()
 }
 
 /// Calculates opened and merged metrics for a single point in time using a rolling window.
 fn calculate_day_metrics(
     prs: &[GitHubPR],
     target_date: DateTime<Utc>,
-    window_size: i64,
+    window_size: Duration,
 ) -> FlowMetricsResponse {
-    let window_start = target_date - chrono::Duration::days(window_size);
+    let window_start = target_date - window_size;
 
     let opened = prs
         .iter()
@@ -100,8 +99,8 @@ mod tests {
     #[test]
     fn test_calculate_metrics_empty() {
         let now = Utc.with_ymd_and_hms(2024, 1, 1, 12, 0, 0).unwrap();
-        let days_to_display = 1;
-        let window_size = 30;
+        let days_to_display = Duration::days(1);
+        let window_size = Duration::days(30);
         let metrics = calculate_metrics_at(&[], days_to_display, window_size, now);
 
         assert_eq!(metrics.len(), 2);
@@ -129,8 +128,8 @@ mod tests {
             },
         ];
 
-        let days_to_display = 0; // Only today
-        let window_size = 30; // 30 day window
+        let days_to_display = Duration::days(0); // Only today
+        let window_size = Duration::days(30); // 30 day window
         let metrics = calculate_metrics_at(&prs, days_to_display, window_size, now);
 
         assert_eq!(metrics.len(), 1);
