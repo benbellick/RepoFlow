@@ -41,8 +41,7 @@ struct AppState {
     /// Thread-safe client for interacting with the GitHub API.
     github_client: GitHubClient,
     /// In-memory cache for repository metrics to avoid redundant API calls and processing.
-    /// Uses Arc to avoid cloning the entire vector on every cache hit.
-    metrics_cache: Cache<String, Arc<Vec<metrics::FlowMetricsResponse>>>,
+    metrics_cache: Cache<String, Vec<metrics::FlowMetricsResponse>>,
 }
 
 /// Parameters extracted from the URL path /api/repos/:owner/:repo/metrics
@@ -130,7 +129,7 @@ async fn health_check() -> Json<HealthResponse> {
 async fn get_repo_metrics(
     Path(RepoPath { owner, repo }): Path<RepoPath>,
     State(state): State<Arc<AppState>>,
-) -> Result<Json<Arc<Vec<metrics::FlowMetricsResponse>>>, (axum::http::StatusCode, String)> {
+) -> Result<Json<Vec<metrics::FlowMetricsResponse>>, (axum::http::StatusCode, String)> {
     let cache_key = get_cache_key(&owner, &repo);
 
     if let Some(cached_metrics) = state.metrics_cache.get(&cache_key).await {
@@ -157,14 +156,9 @@ async fn get_repo_metrics(
         Utc::now(),
     );
 
-    let metrics_arc = Arc::new(metrics);
+    state.metrics_cache.insert(cache_key, metrics.clone()).await;
 
-    state
-        .metrics_cache
-        .insert(cache_key, Arc::clone(&metrics_arc))
-        .await;
-
-    Ok(Json(metrics_arc))
+    Ok(Json(metrics))
 }
 
 fn get_cache_key(owner: &str, repo: &str) -> String {
