@@ -27,7 +27,7 @@ const METRICS_WINDOW_SIZE: i64 = 30;
 /// Time to live for cached repository metrics (24 hours).
 /// Note: This long TTL reduces GitHub API load but may result in stale data.
 /// TODO(#15): Implement a more sophisticated cache invalidation or background refresh strategy.
-const CACHE_TTL_SECONDS: u64 = 86400;
+const CACHE_TTL: StdDuration = StdDuration::from_secs(86400);
 /// Maximum number of entries to keep in the metrics cache.
 const CACHE_MAX_CAPACITY: u64 = 1000;
 
@@ -68,7 +68,7 @@ async fn main() {
 
     let metrics_cache = Cache::builder()
         .max_capacity(CACHE_MAX_CAPACITY)
-        .time_to_live(StdDuration::from_secs(CACHE_TTL_SECONDS))
+        .time_to_live(CACHE_TTL)
         .build();
 
     let state = Arc::new(AppState {
@@ -135,7 +135,7 @@ async fn get_repo_metrics(
     let cache_key = get_cache_key(&owner, &repo);
 
     if let Some(cached_metrics) = state.metrics_cache.get(&cache_key).await {
-        tracing::debug!("Returning cached metrics for {}", cache_key);
+        tracing::debug!(owner = %owner, repo = %repo, "Returning cached metrics");
         return Ok(Json(cached_metrics));
     }
 
