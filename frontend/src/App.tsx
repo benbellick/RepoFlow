@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import type { JSX, ChangeEvent, FormEvent } from 'react'
-import type { FlowMetrics } from './types'
+import type { FlowMetrics, SummaryMetrics } from './types'
 import { Input } from './components/ui/Input'
 import { Button } from './components/ui/Button'
 import { FlowChart } from './components/FlowChart'
@@ -13,6 +13,7 @@ import { Loader2, AlertCircle } from 'lucide-react'
 function App(): JSX.Element {
   const [repoUrl, setRepoUrl] = useState<string>('https://github.com/facebook/react')
   const [data, setData] = useState<FlowMetrics[]>([])
+  const [summary, setSummary] = useState<SummaryMetrics | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -27,8 +28,9 @@ function App(): JSX.Element {
     setError(null)
 
     try {
-      const metrics = await fetchRepoMetrics(repoDetails.owner, repoDetails.repo)
-      setData(metrics)
+      const response = await fetchRepoMetrics(repoDetails.owner, repoDetails.repo)
+      setData(response.time_series)
+      setSummary(response.summary)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred')
     } finally {
@@ -46,15 +48,6 @@ function App(): JSX.Element {
     fetchData('https://github.com/facebook/react')
   }, [])
 
-  const currentOpened = data.length > 0 ? data[data.length - 1].opened : 0
-  const currentMerged = data.length > 0 ? data[data.length - 1].merged : 0
-  const currentSpread = data.length > 0 ? data[data.length - 1].spread : 0
-  const mergeRate = currentOpened > 0 ? Math.round((currentMerged / currentOpened) * 100) : 0
-
-  // Trend analysis
-  const prevSpread = data.length > 1 ? data[data.length - 2].spread : currentSpread
-  const isWidening = currentSpread > prevSpread
-  
   return (
     <div className="min-h-screen bg-bg p-8 font-sans selection:bg-main">
       <header className="max-w-7xl mx-auto mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
@@ -84,37 +77,37 @@ function App(): JSX.Element {
           </div>
         )}
 
-        {data.length > 0 && (
-          <>
-            <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 transition-opacity duration-300 ${loading ? 'opacity-50' : 'opacity-100'}`}>
-              <StatCard 
-                label="PRs Opened (30d)" 
-                value={currentOpened} 
-                color="bg-white"
-              />
-              <StatCard 
-                label="PRs Merged (30d)" 
-                value={currentMerged} 
-                color="bg-white"
-              />
-              <StatCard 
-                label="The Spread" 
-                value={currentSpread} 
-                trend={isWidening ? TrendDirection.UP : TrendDirection.DOWN} 
-                trendLabel={isWidening ? 'Widening' : 'Tightening'}
-                color="bg-main"
-              />
-              <StatCard 
-                label="Merge Rate" 
-                value={`${mergeRate}%`} 
-                color="bg-white"
-              />
-            </div>
+        {summary && (
+          <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 transition-opacity duration-300 ${loading ? 'opacity-50' : 'opacity-100'}`}>
+            <StatCard 
+              label="PRs Opened (30d)" 
+              value={summary.current_opened} 
+              color="bg-white"
+            />
+            <StatCard 
+              label="PRs Merged (30d)" 
+              value={summary.current_merged} 
+              color="bg-white"
+            />
+            <StatCard 
+              label="The Spread" 
+              value={summary.current_spread} 
+              trend={summary.is_widening ? TrendDirection.UP : TrendDirection.DOWN} 
+              trendLabel={summary.is_widening ? 'Widening' : 'Tightening'}
+              color="bg-main"
+            />
+            <StatCard 
+              label="Merge Rate" 
+              value={`${summary.merge_rate}%`} 
+              color="bg-white"
+            />
+          </div>
+        )}
 
-            <div className={`transition-opacity duration-300 ${loading ? 'opacity-50' : 'opacity-100'}`}>
-              <FlowChart data={data} />
-            </div>
-          </>
+        {data.length > 0 && (
+          <div className={`transition-opacity duration-300 ${loading ? 'opacity-50' : 'opacity-100'}`}>
+            <FlowChart data={data} />
+          </div>
         )}
 
         {loading && data.length === 0 && (

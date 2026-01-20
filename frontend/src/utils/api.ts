@@ -1,13 +1,13 @@
-import type { FlowMetrics } from '../types';
+import type { RepoMetricsResponse } from '../types';
 
 /**
  * Fetches repository metrics from the Rust backend API.
  * 
  * @param owner - The GitHub username or organization.
  * @param repo - The repository name.
- * @returns A promise that resolves to an array of FlowMetrics.
+ * @returns A promise that resolves to a RepoMetricsResponse object.
  */
-export const fetchRepoMetrics = async (owner: string, repo: string): Promise<FlowMetrics[]> => {
+export const fetchRepoMetrics = async (owner: string, repo: string): Promise<RepoMetricsResponse> => {
   const response = await fetch(`/api/repos/${owner}/${repo}/metrics`);
 
   if (!response.ok) {
