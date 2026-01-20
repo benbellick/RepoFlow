@@ -1,6 +1,7 @@
 use anyhow::Result;
 use chrono::{DateTime, Utc};
-use octocrab::Octocrab;
+use octocrab::models::pulls::PullRequest;
+use octocrab::{Octocrab, Page};
 use serde::{Deserialize, Serialize};
 
 /// Represents the possible states of a GitHub Pull Request in our system.
@@ -87,37 +88,7 @@ impl GitHubClient {
         let mut page_count = 1;
 
         loop {
-            let mut reached_cutoff = false;
-
-            for pr in &current_page {
-                let created_at = match pr.created_at {
-                    Some(dt) => dt,
-                    None => continue,
-                };
-
-                if created_at >= cutoff_date {
-                    let state = if pr.merged_at.is_some() {
-                        PRState::Merged
-                    } else {
-                        match pr.state {
-                            Some(octocrab::models::IssueState::Open) => PRState::Open,
-                            Some(octocrab::models::IssueState::Closed) => PRState::Closed,
-                            Some(_) => PRState::Unknown,
-                            None => PRState::Unknown,
-                        }
-                    };
-
-                    prs.push(GitHubPR {
-                        id: pr.id.into_inner(),
-                        created_at,
-                        merged_at: pr.merged_at,
-                        state,
-                    });
-                } else {
-                    reached_cutoff = true;
-                    break;
-                }
-            }
+            let reached_cutoff = self.process_pr_page(&current_page, cutoff_date, &mut prs);
 
             if reached_cutoff || page_count >= max_pages {
                 break;
@@ -133,5 +104,45 @@ impl GitHubClient {
         }
 
         Ok(prs)
+    }
+
+    /// Processes a single page of Pull Requests, converting them and checking for the cutoff date.
+    ///
+    /// Returns `true` if a PR older than the cutoff date was found (meaning we should stop fetching).
+    fn process_pr_page(
+        &self,
+        page: &Page<PullRequest>,
+        cutoff_date: DateTime<Utc>,
+        prs: &mut Vec<GitHubPR>,
+    ) -> bool {
+        for pr in &page.items {
+            let created_at = match pr.created_at {
+                Some(dt) => dt,
+                None => continue,
+            };
+
+            if created_at < cutoff_date {
+                return true;
+            }
+
+            let state = if pr.merged_at.is_some() {
+                PRState::Merged
+            } else {
+                match pr.state {
+                    Some(octocrab::models::IssueState::Open) => PRState::Open,
+                    Some(octocrab::models::IssueState::Closed) => PRState::Closed,
+                    Some(_) => PRState::Unknown,
+                    None => PRState::Unknown,
+                }
+            };
+
+            prs.push(GitHubPR {
+                id: pr.id.into_inner(),
+                created_at,
+                merged_at: pr.merged_at,
+                state,
+            });
+        }
+        false
     }
 }
