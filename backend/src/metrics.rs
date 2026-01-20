@@ -18,10 +18,15 @@ pub struct RepoMetricsResponse {
 /// Calculated summary statistics for the latest data point.
 #[derive(Debug, Serialize, Clone)]
 pub struct SummaryMetrics {
+    /// Number of PRs opened in the current rolling window.
     pub current_opened: usize,
+    /// Number of PRs merged in the current rolling window.
     pub current_merged: usize,
+    /// The current difference between opened and merged PRs.
     pub current_spread: i64,
+    /// The percentage of opened PRs that were merged.
     pub merge_rate: u32,
+    /// Whether the spread is widening compared to the previous period.
     pub is_widening: bool,
 }
 
