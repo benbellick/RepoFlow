@@ -127,9 +127,8 @@ async fn get_repo_metrics(
     Path(RepoPath { owner, repo }): Path<RepoPath>,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<metrics::FlowMetricsResponse>>, (axum::http::StatusCode, String)> {
-    let cache_key = format!("{}/{}", owner, repo);
+    let cache_key = get_cache_key(&owner, &repo);
 
-    // Check if we have a cached version of the metrics
     if let Some(cached_metrics) = state.metrics_cache.get(&cache_key).await {
         tracing::debug!("Returning cached metrics for {}", cache_key);
         return Ok(Json(cached_metrics));
@@ -154,10 +153,13 @@ async fn get_repo_metrics(
         Utc::now(),
     );
 
-    // Cache the newly calculated metrics
     state.metrics_cache.insert(cache_key, metrics.clone()).await;
 
     Ok(Json(metrics))
+}
+
+fn get_cache_key(owner: &str, repo: &str) -> String {
+    format!("{}/{}", owner, repo)
 }
 
 async fn shutdown_signal() {
