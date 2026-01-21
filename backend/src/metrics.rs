@@ -6,8 +6,32 @@ const END_OF_DAY_HOUR: u32 = 23;
 const END_OF_DAY_MIN: u32 = 59;
 const END_OF_DAY_SEC: u32 = 59;
 
-/// The public response structure for flow metrics.
+/// The root response structure for repository metrics.
 #[derive(Debug, Serialize, Clone)]
+pub struct RepoMetricsResponse {
+    /// The calculated summary statistics for the latest period.
+    pub summary: SummaryMetrics,
+    /// The day-by-day time series data.
+    pub time_series: Vec<FlowMetricsResponse>,
+}
+
+/// Calculated summary statistics for the latest data point.
+#[derive(Debug, Serialize, Clone, Default)]
+pub struct SummaryMetrics {
+    /// Number of PRs opened in the current rolling window.
+    pub current_opened: usize,
+    /// Number of PRs merged in the current rolling window.
+    pub current_merged: usize,
+    /// The current difference between opened and merged PRs.
+    pub current_spread: i64,
+    /// The percentage of opened PRs that were merged.
+    pub merge_rate: u32,
+    /// Whether the spread is widening compared to the previous period.
+    pub is_widening: bool,
+}
+
+/// A single data point in the flow metrics time series.
+#[derive(Debug, Serialize, Clone, Default)]
 pub struct FlowMetricsResponse {
     /// The date for which the metrics were calculated (YYYY-MM-DD).
     pub date: String,
@@ -31,8 +55,8 @@ pub fn calculate_metrics(
     days_to_display: Duration,
     window_size: Duration,
     now: DateTime<Utc>,
-) -> Vec<FlowMetricsResponse> {
-    (0..=days_to_display.num_days())
+) -> RepoMetricsResponse {
+    let time_series: Vec<FlowMetricsResponse> = (0..=days_to_display.num_days())
         .rev()
         .map(|i| {
             let date = now - Duration::days(i);
@@ -50,7 +74,39 @@ pub fn calculate_metrics(
 
             calculate_day_metrics(prs, target_date, window_size)
         })
-        .collect()
+        .collect();
+
+    let summary = calculate_summary(&time_series);
+
+    RepoMetricsResponse {
+        summary,
+        time_series,
+    }
+}
+
+/// Calculates the summary metrics based on the generated time series.
+fn calculate_summary(time_series: &[FlowMetricsResponse]) -> SummaryMetrics {
+    let Some(latest) = time_series.last() else {
+        return SummaryMetrics::default();
+    };
+
+    let previous = time_series.iter().rev().nth(1);
+
+    let merge_rate = if latest.opened > 0 {
+        ((latest.merged as f64 / latest.opened as f64) * 100.0).round() as u32
+    } else {
+        0
+    };
+
+    let is_widening = previous.is_some_and(|p| latest.spread > p.spread);
+
+    SummaryMetrics {
+        current_opened: latest.opened,
+        current_merged: latest.merged,
+        current_spread: latest.spread,
+        merge_rate,
+        is_widening,
+    }
 }
 
 /// Calculates opened and merged metrics for a single point in time using a rolling window.
@@ -93,12 +149,11 @@ mod tests {
         let now = Utc.with_ymd_and_hms(2024, 1, 1, 12, 0, 0).unwrap();
         let days_to_display = Duration::days(1);
         let window_size = Duration::days(30);
-        let metrics = calculate_metrics(&[], days_to_display, window_size, now);
+        let response = calculate_metrics(&[], days_to_display, window_size, now);
 
-        assert_eq!(metrics.len(), 2);
-        assert_eq!(metrics[0].opened, 0);
-        assert_eq!(metrics[0].merged, 0);
-        assert_eq!(metrics[0].spread, 0);
+        assert_eq!(response.time_series.len(), 2);
+        assert_eq!(response.summary.current_opened, 0);
+        assert_eq!(response.summary.merge_rate, 0);
     }
 
     #[test]
@@ -122,12 +177,21 @@ mod tests {
 
         let days_to_display = Duration::days(0); // Only today
         let window_size = Duration::days(30); // 30 day window
-        let metrics = calculate_metrics(&prs, days_to_display, window_size, now);
+        let response = calculate_metrics(&prs, days_to_display, window_size, now);
 
-        assert_eq!(metrics.len(), 1);
-        assert_eq!(metrics[0].date, "2024-01-10");
-        assert_eq!(metrics[0].opened, 2);
-        assert_eq!(metrics[0].merged, 1);
-        assert_eq!(metrics[0].spread, 1);
+        assert_eq!(response.time_series.len(), 1);
+        assert_eq!(response.summary.current_opened, 2);
+        assert_eq!(response.summary.current_merged, 1);
+        assert_eq!(response.summary.merge_rate, 50);
+    }
+
+    #[test]
+    fn test_calculate_summary_empty() {
+        let metrics = calculate_summary(&[]);
+        assert_eq!(metrics.current_opened, 0);
+        assert_eq!(metrics.current_merged, 0);
+        assert_eq!(metrics.current_spread, 0);
+        assert_eq!(metrics.merge_rate, 0);
+        assert_eq!(metrics.is_widening, false);
     }
 }

@@ -1,11 +1,21 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import App from './App';
-import * as github from './utils/github';
+import * as api from './utils/api';
 
 describe('App', () => {
   it('shows no data message when metrics are empty', async () => {
-    const fetchSpy = vi.spyOn(github, 'fetchPullRequests').mockResolvedValue([]);
+    // Mock fetchRepoMetrics to return empty time_series and summary
+    const fetchSpy = vi.spyOn(api, 'fetchRepoMetrics').mockResolvedValue({
+        time_series: [],
+        summary: {
+            current_opened: 0,
+            current_merged: 0,
+            current_spread: 0,
+            merge_rate: 0,
+            is_widening: false
+        }
+    });
 
     render(<App />);
 
