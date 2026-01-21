@@ -1,24 +1,24 @@
-import type { JSX } from "react";
-import { Card } from "./ui/Card";
-import { ArrowUpRight, ArrowDownRight, Minus, Info } from "lucide-react";
-import { TrendDirection } from "../types";
+import type { JSX } from 'react'
+import { Card } from './ui/Card'
+import { ArrowUpRight, ArrowDownRight, Minus, Info } from 'lucide-react'
+import { TrendDirection } from '../types'
 
 /**
  * Props for the StatCard component.
  */
 interface StatCardProps {
   /** The label text for the statistic (e.g., "PRs Opened"). */
-  label: string;
+  label: string
   /** The value to display (e.g., "123" or "45%"). */
-  value: string | number;
+  value: string | number
   /** The direction of the trend, if applicable. */
-  trend?: TrendDirection;
+  trend?: TrendDirection
   /** A descriptive label for the trend (e.g., "+12% vs last period"). */
-  trendLabel?: string;
+  trendLabel?: string
   /** The background color class for the card. Defaults to "bg-white". */
-  color?: string;
+  color?: string
   /** Optional tooltip text to describe the metric. */
-  description?: string;
+  description?: string
 }
 
 /**
@@ -29,21 +29,21 @@ export const StatCard = ({
   value,
   trend,
   trendLabel,
-  color = "bg-white",
+  color = 'bg-white',
   description,
 }: StatCardProps): JSX.Element => {
   const renderTrendIcon = (): JSX.Element | null => {
     switch (trend) {
       case TrendDirection.UP:
-        return <ArrowUpRight size={16} strokeWidth={3} />;
+        return <ArrowUpRight size={16} strokeWidth={3} />
       case TrendDirection.DOWN:
-        return <ArrowDownRight size={16} strokeWidth={3} />;
+        return <ArrowDownRight size={16} strokeWidth={3} />
       case TrendDirection.NEUTRAL:
-        return <Minus size={16} strokeWidth={3} />;
+        return <Minus size={16} strokeWidth={3} />
       default:
-        return null;
+        return null
     }
-  };
+  }
 
   return (
     <Card className={`${color} relative group`}>
@@ -69,5 +69,5 @@ export const StatCard = ({
         </div>
       )}
     </Card>
-  );
-};
+  )
+}

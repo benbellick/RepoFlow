@@ -1,4 +1,4 @@
-import type { JSX } from "react";
+import type { JSX } from 'react'
 import {
   LineChart,
   Line,
@@ -8,16 +8,16 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
-} from "recharts";
-import type { FlowMetrics } from "../types";
-import { Card } from "./ui/Card";
+} from 'recharts'
+import type { FlowMetrics } from '../types'
+import { Card } from './ui/Card'
 
 /**
  * Props for the FlowChart component.
  */
 interface FlowChartProps {
   /** Array of flow metrics to visualize. */
-  data: FlowMetrics[];
+  data: FlowMetrics[]
 }
 
 /**
@@ -34,20 +34,20 @@ export const FlowChart = ({ data }: FlowChartProps): JSX.Element => {
           <XAxis
             dataKey="date"
             stroke="#000"
-            tick={{ fill: "#000", fontWeight: "bold" }}
+            tick={{ fill: '#000', fontWeight: 'bold' }}
             axisLine={{ strokeWidth: 2 }}
           />
           <YAxis
             stroke="#000"
-            tick={{ fill: "#000", fontWeight: "bold" }}
+            tick={{ fill: '#000', fontWeight: 'bold' }}
             axisLine={{ strokeWidth: 2 }}
           />
           <Tooltip
             contentStyle={{
-              backgroundColor: "#fff",
-              border: "4px solid #000",
-              borderRadius: "0px",
-              fontWeight: "bold",
+              backgroundColor: '#fff',
+              border: '4px solid #000',
+              borderRadius: '0px',
+              fontWeight: 'bold',
             }}
           />
           <Legend />
@@ -72,5 +72,5 @@ export const FlowChart = ({ data }: FlowChartProps): JSX.Element => {
         </LineChart>
       </ResponsiveContainer>
     </Card>
-  );
-};
+  )
+}
