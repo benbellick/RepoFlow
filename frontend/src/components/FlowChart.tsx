@@ -9,7 +9,7 @@ import {
   ResponsiveContainer, 
   Legend 
 } from 'recharts'
-import type { FlowMetrics } from '../utils/metrics'
+import type { FlowMetrics } from '../types'
 import { Card } from './ui/Card'
 
 /**

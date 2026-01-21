@@ -1,20 +1,20 @@
 import { useState, useEffect } from 'react'
 import type { JSX, ChangeEvent, FormEvent } from 'react'
-import { calculateMetrics, generateDummyData } from './utils/metrics'
-import type { FlowMetrics } from './utils/metrics'
+import type { FlowMetrics, SummaryMetrics } from './types'
 import { Input } from './components/ui/Input'
 import { Button } from './components/ui/Button'
 import { FlowChart } from './components/FlowChart'
 import { StatCard } from './components/StatsCards'
 import { TrendDirection } from './types'
 import { parseGitHubUrl } from './utils/parser'
-import { fetchPullRequests } from './utils/github'
+import { fetchRepoMetrics } from './utils/api'
 import { Loader2, AlertCircle } from 'lucide-react'
 
 function App(): JSX.Element {
   const [repoUrl, setRepoUrl] = useState<string>('https://github.com/facebook/react')
-  const [data, setData] = useState<FlowMetrics[]>(generateDummyData(30))
-  const [loading, setLoading] = useState<boolean>(false)
+  const [data, setData] = useState<FlowMetrics[]>([])
+  const [summary, setSummary] = useState<SummaryMetrics | null>(null)
+  const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
 
   const fetchData = async (url: string): Promise<void> => {
@@ -28,9 +28,9 @@ function App(): JSX.Element {
     setError(null)
 
     try {
-      const prs = await fetchPullRequests(repoDetails.owner, repoDetails.repo)
-      const metrics = calculateMetrics(prs)
-      setData(metrics)
+      const response = await fetchRepoMetrics(repoDetails.owner, repoDetails.repo)
+      setData(response.time_series)
+      setSummary(response.summary)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred')
     } finally {
@@ -48,20 +48,11 @@ function App(): JSX.Element {
     fetchData('https://github.com/facebook/react')
   }, [])
 
-  const currentOpened = data[data.length - 1].opened
-  const currentMerged = data[data.length - 1].merged
-  const currentSpread = data[data.length - 1].spread
-  const mergeRate = currentOpened > 0 ? Math.round((currentMerged / currentOpened) * 100) : 0
-
-  // Trend analysis (very simple V1)
-  const prevSpread = data.length > 1 ? data[data.length - 2].spread : currentSpread
-  const isWidening = currentSpread > prevSpread
-  
   return (
     <div className="min-h-screen bg-bg p-8 font-sans selection:bg-main">
       <header className="max-w-7xl mx-auto mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
-          <h1 className="text-6xl mb-2 italic tracking-tighter">RepoFlow</h1>
+          <h1 className="text-6xl mb-2 italic tracking-tighter text-black font-black uppercase underline decoration-main decoration-8">RepoFlow</h1>
           <p className="text-xl font-base">Measure OSS contribution efficiency.</p>
         </div>
         
@@ -80,46 +71,57 @@ function App(): JSX.Element {
 
       <main className="max-w-7xl mx-auto">
         {error && (
-          <div className="mb-8 border-4 border-black bg-red-400 p-4 flex items-center gap-3 font-heading">
+          <div className="mb-8 border-4 border-black bg-red-400 p-4 flex items-center gap-3 font-heading shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
             <AlertCircle size={24} />
             {error}
           </div>
         )}
 
-        <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 transition-opacity duration-300 ${loading ? 'opacity-50' : 'opacity-100'}`}>
-          <StatCard 
-            label="PRs Opened (30d)" 
-            value={currentOpened} 
-            color="bg-white"
-          />
-          <StatCard 
-            label="PRs Merged (30d)" 
-            value={currentMerged} 
-            color="bg-white"
-          />
-          <StatCard 
-            label="The Spread" 
-            value={currentSpread} 
-            trend={isWidening ? TrendDirection.UP : TrendDirection.DOWN} 
-            trendLabel={isWidening ? 'Widening' : 'Tightening'}
-            color="bg-main"
-          />
-          <StatCard 
-            label="Merge Rate" 
-            value={`${mergeRate}%`} 
-            color="bg-white"
-          />
-        </div>
+        {summary && (
+          <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 transition-opacity duration-300 ${loading ? 'opacity-50' : 'opacity-100'}`}>
+            <StatCard 
+              label="PRs Opened (30d)" 
+              value={summary.current_opened} 
+              color="bg-white"
+            />
+            <StatCard 
+              label="PRs Merged (30d)" 
+              value={summary.current_merged} 
+              color="bg-white"
+            />
+            <StatCard 
+              label="The Spread" 
+              value={summary.current_spread} 
+              trend={summary.is_widening ? TrendDirection.UP : TrendDirection.DOWN} 
+              trendLabel={summary.is_widening ? 'Widening' : 'Tightening'}
+              color="bg-main"
+            />
+            <StatCard 
+              label="Merge Rate" 
+              value={`${summary.merge_rate}%`} 
+              color="bg-white"
+            />
+          </div>
+        )}
 
-        <div className={`transition-opacity duration-300 ${loading ? 'opacity-50' : 'opacity-100'}`}>
-          <FlowChart data={data} />
-        </div>
+        {data.length > 0 && (
+          <div className={`transition-opacity duration-300 ${loading ? 'opacity-50' : 'opacity-100'}`}>
+            <FlowChart data={data} />
+          </div>
+        )}
+
+        {loading && data.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-20 border-4 border-dashed border-black rounded-none bg-white shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+            <Loader2 className="animate-spin mb-4" size={48} />
+            <p className="font-heading text-xl uppercase tracking-widest">Fetching repo history...</p>
+          </div>
+        )}
       </main>
 
       <footer className="max-w-7xl mx-auto mt-12 pt-8 border-t-4 border-black font-base flex justify-between items-center">
         <p>© 2026 RepoFlow - Measuring PR Liquidity</p>
         <div className="flex gap-6">
-          <a href="https://github.com" className="hover:underline font-heading">GitHub</a>
+          <a href="https://github.com/benbellick/RepoFlow" className="hover:underline font-heading">GitHub</a>
           <a href="#" className="hover:underline font-heading">About</a>
         </div>
       </footer>
