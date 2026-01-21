@@ -28,31 +28,43 @@ export const About = ({ isOpen, onClose }: AboutProps): JSX.Element | null => {
 
         <div className="space-y-6 font-base text-lg">
           <p>
-            <strong>RepoFlow</strong> is a tool designed to visualize the "liquidity" of open source contributions. 
-            It helps maintainers and contributors understand how efficiently a repository processes Pull Requests.
+            Traditional metrics like <strong>stars</strong> and <strong>forks</strong> measure popularity, but they don't capture the actual <em>velocity</em> of a project. 
+            <strong>RepoFlow</strong> fills this gap by measuring the flow of Pull Requests.
           </p>
+
+          <p>
+            We believe that a healthy project is defined by a balance between two forces:
+          </p>
+
+          <ul className="list-disc pl-6 space-y-2">
+            <li>
+              <strong>Contributor Appetite:</strong> A high volume of <em>Opened PRs</em> signals that the world is hungry to improve the tool.
+            </li>
+            <li>
+              <strong>Maintainer Activity:</strong> A high volume of <em>Merged PRs</em> signals a friendly, responsive maintainer team.
+            </li>
+          </ul>
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="border-2 border-black p-4 bg-bg">
               <h3 className="font-heading text-xl mb-2">The Spread</h3>
               <p className="text-sm">
-                The difference between <strong>Opened</strong> and <strong>Merged</strong> PRs. 
-                A widening positive spread indicates a growing backlog (technical debt), while a tightening or negative spread means the maintainers are catching up.
+                The difference between Opened and Merged PRs. 
+                Health is about these two matching comparably. A wide spread suggests a project that is "frozen" or underwater, while a tight spread indicates "liquidity."
               </p>
             </div>
 
             <div className="border-2 border-black p-4 bg-bg">
               <h3 className="font-heading text-xl mb-2">Merge Rate</h3>
               <p className="text-sm">
-                The percentage of opened PRs that were eventually merged in the given window. 
-                High merge rates suggest a healthy, active project where contributions are welcomed and processed quickly.
+                The percentage of opened PRs that were merged. 
+                This measures the efficiency of the conversion from "stated appetite" to "actual project growth."
               </p>
             </div>
           </div>
 
           <p>
-            This project uses the GitHub API to fetch real-time data. 
-            Popular repositories are preloaded for instant access.
+            Popularity is noise; <strong>Flow is signal.</strong>
           </p>
         </div>
 
