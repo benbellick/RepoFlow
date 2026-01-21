@@ -194,8 +194,8 @@ async fn fetch_and_calculate_metrics(
         .map_err(|e| {
             tracing::error!("Failed to fetch PRs for {}/{}: {}", owner, repo, e);
 
-            if let Some(octocrab_err) = e.downcast_ref::<octocrab::Error>() {
-                if let octocrab::Error::GitHub { source, .. } = octocrab_err {
+            match e {
+                octocrab::Error::GitHub { source, .. } => {
                     if source.message.to_lowercase().contains("rate limit") {
                         return (
                             axum::http::StatusCode::TOO_MANY_REQUESTS,
@@ -209,6 +209,7 @@ async fn fetch_and_calculate_metrics(
                         );
                     }
                 }
+                _ => {}
             }
 
             (
