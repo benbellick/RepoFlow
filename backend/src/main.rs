@@ -147,7 +147,7 @@ async fn get_repo_metrics(
         .await
         .map_err(|e| {
             tracing::error!("Failed to fetch PRs for {}/{}: {}", owner, repo, e);
-            
+
             match e {
                 octocrab::Error::GitHub { source, .. } => {
                     if source.message.to_lowercase().contains("rate limit") {
@@ -183,7 +183,6 @@ async fn get_repo_metrics(
 
     Ok(Json(metrics))
 }
-
 fn get_cache_key(owner: &str, repo: &str) -> String {
     format!("owner::{}/repo::{}", owner, repo)
 }
