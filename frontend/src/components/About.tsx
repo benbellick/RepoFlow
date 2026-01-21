@@ -52,8 +52,8 @@ export const About = ({ isOpen, onClose }: AboutProps): JSX.Element | null => {
 
           <div className="space-y-6 font-base text-lg">
             <p>
-              Traditional metrics like <strong>stars</strong> and <strong>forks</strong> measure popularity, but they don't capture the actual <em>velocity</em> of a project. 
-              <strong>RepoFlow</strong> fills this gap by measuring the flow of Pull Requests.
+              Traditional metrics like <strong>stars</strong> and <strong>forks</strong> measure popularity, but they don't capture the actual <em>velocity</em> of a project.
+              {" "}<strong>RepoFlow</strong> fills this gap by measuring the flow of Pull Requests.
             </p>
 
             <p>
@@ -62,10 +62,10 @@ export const About = ({ isOpen, onClose }: AboutProps): JSX.Element | null => {
 
             <ul className="list-disc pl-6 space-y-2">
               <li>
-                <strong>Contributor Appetite:</strong> A high volume of <em>Opened PRs</em> signals that the world is hungry to improve the tool.
+                <strong>Contributor Appetite:</strong> A high volume of <em>Opened PRs</em> signals that the world is actively using the tool and interested in expanding its utility.
               </li>
               <li>
-                <strong>Maintainer Activity:</strong> A high volume of <em>Merged PRs</em> signals a friendly, responsive maintainer team.
+                <strong>Maintainer Activity:</strong> A high volume of <em>Merged PRs</em> signals that maintainers are friendly, responsive, and appropriately managing the interest in their project.
               </li>
             </ul>
 
@@ -74,7 +74,7 @@ export const About = ({ isOpen, onClose }: AboutProps): JSX.Element | null => {
                 <h3 className="font-heading text-xl mb-2">The Spread</h3>
                 <p className="text-sm">
                   The difference between Opened and Merged PRs. 
-                  Health is about these two matching comparably. A wide spread suggests a project that is "frozen" or underwater, while a tight spread indicates "liquidity."
+                  A wide spread isn't necessarily bad, but a <em>widening</em> spread is a sign that maintenance is becoming difficult or a backlog is building up.
                 </p>
               </div>
 
@@ -82,7 +82,7 @@ export const About = ({ isOpen, onClose }: AboutProps): JSX.Element | null => {
                 <h3 className="font-heading text-xl mb-2">Merge Rate</h3>
                 <p className="text-sm">
                   The percentage of opened PRs that were merged. 
-                  This measures the efficiency of the conversion from "stated appetite" to "actual project growth."
+                  This measures how effectively the project incorporates community contributions.
                 </p>
               </div>
             </div>
