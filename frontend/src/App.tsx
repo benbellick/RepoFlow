@@ -48,6 +48,8 @@ function App(): JSX.Element {
     fetchData('https://github.com/facebook/react')
   }, [])
 
+  const hasData = data.some(day => day.opened > 0 || day.merged > 0)
+
   return (
     <div className="min-h-screen bg-bg p-8 font-sans selection:bg-main">
       <header className="max-w-7xl mx-auto mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
@@ -79,43 +81,48 @@ function App(): JSX.Element {
 
         {summary && (
           <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 transition-opacity duration-300 ${loading ? 'opacity-50' : 'opacity-100'}`}>
-            <StatCard 
-              label="PRs Opened (30d)" 
-              value={summary.current_opened} 
+            <StatCard
+              label="PRs Opened (30d)"
+              value={summary.current_opened}
               color="bg-white"
             />
-            <StatCard 
-              label="PRs Merged (30d)" 
-              value={summary.current_merged} 
+            <StatCard
+              label="PRs Merged (30d)"
+              value={summary.current_merged}
               color="bg-white"
             />
-            <StatCard 
-              label="The Spread" 
-              value={summary.current_spread} 
-              trend={summary.is_widening ? TrendDirection.UP : TrendDirection.DOWN} 
+            <StatCard
+              label="The Spread"
+              value={summary.current_spread}
+              trend={summary.is_widening ? TrendDirection.UP : TrendDirection.DOWN}
               trendLabel={summary.is_widening ? 'Widening' : 'Tightening'}
               color="bg-main"
             />
-            <StatCard 
-              label="Merge Rate" 
-              value={`${summary.merge_rate}%`} 
+            <StatCard
+              label="Merge Rate"
+              value={`${summary.merge_rate}%`}
               color="bg-white"
             />
           </div>
         )}
 
-        {data.length > 0 && (
-          <div className={`transition-opacity duration-300 ${loading ? 'opacity-50' : 'opacity-100'}`}>
+        <div className={`transition-opacity duration-300 ${loading ? 'opacity-50' : 'opacity-100'}`}>
+          {loading && data.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 border-4 border-dashed border-black rounded-none bg-white shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+               <Loader2 className="animate-spin mb-4" size={48} />
+               <p className="font-heading text-xl uppercase tracking-widest">Fetching repo history...</p>
+            </div>
+          ) : hasData ? (
             <FlowChart data={data} />
-          </div>
-        )}
-
-        {loading && data.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-20 border-4 border-dashed border-black rounded-none bg-white shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
-            <Loader2 className="animate-spin mb-4" size={48} />
-            <p className="font-heading text-xl uppercase tracking-widest">Fetching repo history...</p>
-          </div>
-        )}
+          ) : (
+            <div className="border-4 border-black bg-white p-12 text-center shadow-base">
+              <h2 className="text-3xl font-heading mb-4">No Data Found</h2>
+              <p className="text-xl font-base text-gray-600">
+                We couldn't find any pull requests for this repository in the analyzed time period.
+              </p>
+            </div>
+          )}
+        </div>
       </main>
 
       <footer className="max-w-7xl mx-auto mt-12 pt-8 border-t-4 border-black font-base flex justify-between items-center">
