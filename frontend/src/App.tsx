@@ -86,7 +86,7 @@ function App(): JSX.Element {
             placeholder="https://github.com/owner/repo"
             className="flex-grow md:w-96"
           />
-          <Button type="submit" className="flex items-center gap-2 min-w-[140px] justify-center" disabled={loading}>
+          <Button type="submit" className="flex items-center gap-2 min-w-[140px] justify-center">
             Analyze
           </Button>
         </form>
