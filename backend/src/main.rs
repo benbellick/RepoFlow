@@ -234,7 +234,7 @@ async fn fetch_and_calculate_metrics(
 
 async fn preload_popular_repos(state: Arc<AppState>) {
     tracing::info!("Preloading {} popular repositories", POPULAR_REPOS.len());
-    
+
     stream::iter(POPULAR_REPOS)
         .for_each_concurrent(MAX_CONCURRENT_PRELOADS, |&(owner, repo)| {
             let state = state.clone();
@@ -243,7 +243,7 @@ async fn preload_popular_repos(state: Arc<AppState>) {
             }
         })
         .await;
-        
+
     tracing::info!("Finished preloading popular repositories");
 }
 
