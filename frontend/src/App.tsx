@@ -5,6 +5,7 @@ import { Input } from './components/ui/Input'
 import { Button } from './components/ui/Button'
 import { FlowChart } from './components/FlowChart'
 import { StatCard } from './components/StatsCards'
+import { About } from './components/About'
 import { TrendDirection } from './types'
 import { parseGitHubUrl } from './utils/parser'
 import { fetchRepoMetrics, fetchPopularRepos } from './utils/api'
@@ -17,6 +18,7 @@ function App(): JSX.Element {
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
   const [popularRepos, setPopularRepos] = useState<PopularRepo[]>([])
+  const [isAboutOpen, setIsAboutOpen] = useState<boolean>(false)
 
   const fetchData = useCallback(async (url: string): Promise<void> => {
     const repoDetails = parseGitHubUrl(url)
@@ -73,6 +75,8 @@ function App(): JSX.Element {
 
   return (
     <div className="min-h-screen bg-bg p-8 font-sans selection:bg-main">
+      <About isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} />
+      
       <header className="max-w-7xl mx-auto mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
           <h1 className="text-6xl mb-2 italic tracking-tighter text-black font-black uppercase underline decoration-main decoration-8">RepoFlow</h1>
@@ -171,7 +175,7 @@ function App(): JSX.Element {
         <p>© 2026 RepoFlow - Measuring PR Liquidity</p>
         <div className="flex gap-6">
           <a href="https://github.com/benbellick/RepoFlow" className="hover:underline font-heading">GitHub</a>
-          <a href="#" className="hover:underline font-heading">About</a>
+          <button onClick={() => setIsAboutOpen(true)} className="hover:underline font-heading hover:bg-main px-2 -mx-2 transition-colors">About</button>
         </div>
       </footer>
     </div>
