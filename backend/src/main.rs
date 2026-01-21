@@ -147,6 +147,25 @@ async fn get_repo_metrics(
         .await
         .map_err(|e| {
             tracing::error!("Failed to fetch PRs for {}/{}: {}", owner, repo, e);
+            
+            match e {
+                octocrab::Error::GitHub { source, .. } => {
+                    if source.message.to_lowercase().contains("rate limit") {
+                        return (
+                            axum::http::StatusCode::TOO_MANY_REQUESTS,
+                            "GitHub Rate Limit Exceeded".to_string(),
+                        );
+                    }
+                    if source.message.to_lowercase().contains("not found") {
+                        return (
+                            axum::http::StatusCode::NOT_FOUND,
+                            "Repository Not Found".to_string(),
+                        );
+                    }
+                }
+                _ => {}
+            }
+
             (
                 axum::http::StatusCode::INTERNAL_SERVER_ERROR,
                 "Internal Server Error".to_string(),
