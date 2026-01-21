@@ -87,7 +87,6 @@ function App(): JSX.Element {
             className="flex-grow md:w-96"
           />
           <Button type="submit" className="flex items-center gap-2 min-w-[140px] justify-center" disabled={loading}>
-            {loading && <Loader2 className="animate-spin" size={20} />}
             Analyze
           </Button>
         </form>
