@@ -131,11 +131,13 @@ function App(): JSX.Element {
               label="PRs Opened (30d)"
               value={summary.current_opened}
               color="bg-white"
+              description="Total pull requests created in the last 30 days."
             />
             <StatCard
               label="PRs Merged (30d)"
               value={summary.current_merged}
               color="bg-white"
+              description="Total pull requests merged in the last 30 days."
             />
             <StatCard
               label="The Spread"
@@ -143,11 +145,13 @@ function App(): JSX.Element {
               trend={summary.is_widening ? TrendDirection.UP : TrendDirection.DOWN}
               trendLabel={summary.is_widening ? 'Widening' : 'Tightening'}
               color="bg-main"
+              description="Difference between opened and merged PRs. A widening spread means the backlog is growing."
             />
             <StatCard
               label="Merge Rate"
               value={`${summary.merge_rate}%`}
               color="bg-white"
+              description="Percentage of opened PRs that were merged in the same period."
             />
           </div>
         )}
