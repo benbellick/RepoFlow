@@ -26,8 +26,8 @@ export const Input = ({ value, onChange, placeholder, className }: InputProps): 
     onChange={onChange}
     placeholder={placeholder}
     className={cn(
-      "border-4 border-black bg-white px-4 py-3 font-base text-lg outline-none focus:ring-2 focus:ring-mainAccent transition-all",
-      className
+      'border-4 border-black bg-white px-4 py-3 font-base text-lg outline-none focus:ring-2 focus:ring-mainAccent transition-all',
+      className,
     )}
   />
 )

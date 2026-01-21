@@ -24,7 +24,14 @@ interface StatCardProps {
 /**
  * A card component designed to display a single metric with an optional trend indicator.
  */
-export const StatCard = ({ label, value, trend, trendLabel, color = 'bg-white', description }: StatCardProps): JSX.Element => {
+export const StatCard = ({
+  label,
+  value,
+  trend,
+  trendLabel,
+  color = 'bg-white',
+  description,
+}: StatCardProps): JSX.Element => {
   const renderTrendIcon = (): JSX.Element | null => {
     switch (trend) {
       case TrendDirection.UP:
@@ -44,7 +51,10 @@ export const StatCard = ({ label, value, trend, trendLabel, color = 'bg-white', 
         <p className="font-base text-sm uppercase tracking-wider">{label}</p>
         {description && (
           <div className="relative">
-            <Info size={16} className="text-black/50 cursor-help hover:text-black transition-colors" />
+            <Info
+              size={16}
+              className="text-black/50 cursor-help hover:text-black transition-colors"
+            />
             <div className="absolute bottom-full right-0 mb-2 w-48 p-2 bg-black text-white text-xs font-base hidden group-hover:block z-10 shadow-[4px_4px_0px_0px_rgba(255,255,255,1)] border-2 border-white">
               {description}
             </div>

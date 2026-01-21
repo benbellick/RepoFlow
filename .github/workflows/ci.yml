@@ -29,6 +29,9 @@ jobs:
       - name: Type Check
         run: npx tsc
 
+      - name: Check Formatting
+        run: npm run format:check
+
       - name: Lint
         run: npm run lint -- --max-warnings 0
 
