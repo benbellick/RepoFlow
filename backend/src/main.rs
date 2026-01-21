@@ -148,22 +148,19 @@ async fn get_repo_metrics(
         .map_err(|e| {
             tracing::error!("Failed to fetch PRs for {}/{}: {}", owner, repo, e);
 
-            match e {
-                octocrab::Error::GitHub { source, .. } => {
-                    if source.message.to_lowercase().contains("rate limit") {
-                        return (
-                            axum::http::StatusCode::TOO_MANY_REQUESTS,
-                            "GitHub Rate Limit Exceeded".to_string(),
-                        );
-                    }
-                    if source.message.to_lowercase().contains("not found") {
-                        return (
-                            axum::http::StatusCode::NOT_FOUND,
-                            "Repository Not Found".to_string(),
-                        );
-                    }
+            if let octocrab::Error::GitHub { source, .. } = &e {
+                if source.message.to_lowercase().contains("rate limit") {
+                    return (
+                        axum::http::StatusCode::TOO_MANY_REQUESTS,
+                        "GitHub Rate Limit Exceeded".to_string(),
+                    );
                 }
-                _ => {}
+                if source.message.to_lowercase().contains("not found") {
+                    return (
+                        axum::http::StatusCode::NOT_FOUND,
+                        "Repository Not Found".to_string(),
+                    );
+                }
             }
 
             (

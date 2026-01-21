@@ -42,6 +42,7 @@ impl GitHubClient {
     ///
     /// # Arguments
     /// * `token` - A GitHub Personal Access Token (PAT). Recommended to avoid rate limits.
+    #[allow(clippy::result_large_err)]
     pub fn new(token: Option<String>) -> octocrab::Result<Self> {
         let mut builder = Octocrab::builder();
         if let Some(token) = token {
