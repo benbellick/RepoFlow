@@ -2,7 +2,7 @@ import type { RepoMetricsResponse, PopularRepo } from '../types';
 
 /**
  * Fetches repository metrics from the Rust backend API.
- * 
+ *
  * @param owner - The GitHub username or organization.
  * @param repo - The repository name.
  * @returns A promise that resolves to a RepoMetricsResponse object.
@@ -20,7 +20,6 @@ export const fetchRepoMetrics = async (owner: string, repo: string): Promise<Rep
 
   return response.json();
 };
-
 /**
  * Fetches the list of popular repositories from the backend.
  * 
