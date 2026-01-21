@@ -15,3 +15,4 @@ chrono = { version = "0.4.43", features = ["serde"] }
 anyhow = "1.0.100"
 octocrab = "0.40.0"
 moka = { version = "0.12.12", features = ["future"] }
+futures = "0.3.31"

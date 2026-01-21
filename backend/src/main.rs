@@ -7,6 +7,7 @@ use axum::{
     Json, Router,
 };
 use chrono::{Duration, Utc};
+use futures::stream::{self, StreamExt};
 use github::GitHubClient;
 use moka::future::Cache;
 use serde::{Deserialize, Serialize};
@@ -31,6 +32,8 @@ const METRICS_WINDOW_SIZE: i64 = 30;
 const CACHE_TTL: StdDuration = StdDuration::from_secs(86400);
 /// Maximum number of entries to keep in the metrics cache.
 const CACHE_MAX_CAPACITY: u64 = 1000;
+/// Maximum number of concurrent requests for preloading popular repositories.
+const MAX_CONCURRENT_PRELOADS: usize = 4;
 
 /// List of popular repositories to preload and display in the UI.
 const POPULAR_REPOS: &[(&str, &str)] = &[
@@ -231,20 +234,32 @@ async fn fetch_and_calculate_metrics(
 
 async fn preload_popular_repos(state: Arc<AppState>) {
     tracing::info!("Preloading {} popular repositories", POPULAR_REPOS.len());
-    for (owner, repo) in POPULAR_REPOS {
-        let cache_key = get_cache_key(owner, repo);
-        match fetch_and_calculate_metrics(&state, owner, repo).await {
-            Ok(metrics) => {
-                state.metrics_cache.insert(cache_key, metrics).await;
-                tracing::info!(owner = %owner, repo = %repo, "Preloaded metrics");
+    
+    stream::iter(POPULAR_REPOS)
+        .for_each_concurrent(MAX_CONCURRENT_PRELOADS, |&(owner, repo)| {
+            let state = state.clone();
+            async move {
+                preload_single_repo(&state, owner, repo).await;
             }
-            Err((status, msg)) => {
-                tracing::warn!(owner = %owner, repo = %repo, status = ?status, msg = %msg, "Failed to preload metrics");
-            }
-        }
-    }
+        })
+        .await;
+        
     tracing::info!("Finished preloading popular repositories");
 }
+
+async fn preload_single_repo(state: &AppState, owner: &str, repo: &str) {
+    let cache_key = get_cache_key(owner, repo);
+    match fetch_and_calculate_metrics(state, owner, repo).await {
+        Ok(metrics) => {
+            state.metrics_cache.insert(cache_key, metrics).await;
+            tracing::info!(owner = %owner, repo = %repo, "Preloaded metrics");
+        }
+        Err((status, msg)) => {
+            tracing::warn!(owner = %owner, repo = %repo, status = ?status, msg = %msg, "Failed to preload metrics");
+        }
+    }
+}
+
 fn get_cache_key(owner: &str, repo: &str) -> String {
     format!("owner::{}/repo::{}", owner, repo)
 }
