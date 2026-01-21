@@ -1,3 +1,4 @@
+use anyhow::Result;
 use chrono::{DateTime, Utc};
 use octocrab::models::pulls::PullRequest;
 use octocrab::{Octocrab, Page};
@@ -42,8 +43,7 @@ impl GitHubClient {
     ///
     /// # Arguments
     /// * `token` - A GitHub Personal Access Token (PAT). Recommended to avoid rate limits.
-    #[allow(clippy::result_large_err)]
-    pub fn new(token: Option<String>) -> octocrab::Result<Self> {
+    pub fn new(token: Option<String>) -> Result<Self> {
         let mut builder = Octocrab::builder();
         if let Some(token) = token {
             builder = builder.personal_token(token);
@@ -70,7 +70,7 @@ impl GitHubClient {
         repo: &str,
         days: i64,
         max_pages: u32,
-    ) -> octocrab::Result<Vec<GitHubPR>> {
+    ) -> Result<Vec<GitHubPR>> {
         let cutoff_date = Utc::now() - chrono::Duration::days(days);
         let mut prs = Vec::new();
 

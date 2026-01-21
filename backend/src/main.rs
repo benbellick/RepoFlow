@@ -148,7 +148,9 @@ async fn get_repo_metrics(
         .map_err(|e| {
             tracing::error!("Failed to fetch PRs for {}/{}: {}", owner, repo, e);
 
-            if let octocrab::Error::GitHub { source, .. } = &e {
+            if let Some(octocrab::Error::GitHub { source, .. }) =
+                e.downcast_ref::<octocrab::Error>()
+            {
                 // TODO(#29): Refactor this brittle string matching.
                 // We should inspect the raw HTTP status code or use a strongly-typed error variant if available.
                 if source.message.to_lowercase().contains("rate limit") {
