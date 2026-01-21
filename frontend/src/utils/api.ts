@@ -7,8 +7,13 @@ import type { RepoMetricsResponse, PopularRepo } from '../types';
  * @param repo - The repository name.
  * @returns A promise that resolves to a RepoMetricsResponse object.
  */
-export const fetchRepoMetrics = async (owner: string, repo: string): Promise<RepoMetricsResponse> => {
-  const response = await fetch(`/api/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/metrics`);
+export const fetchRepoMetrics = async (
+  owner: string,
+  repo: string,
+): Promise<RepoMetricsResponse> => {
+  const response = await fetch(
+    `/api/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/metrics`,
+  );
 
   if (!response.ok) {
     if (response.status === 404) {
@@ -22,7 +27,7 @@ export const fetchRepoMetrics = async (owner: string, repo: string): Promise<Rep
 };
 /**
  * Fetches the list of popular repositories from the backend.
- * 
+ *
  * @returns A promise that resolves to an array of PopularRepo objects.
  */
 export const fetchPopularRepos = async (): Promise<PopularRepo[]> => {

@@ -1,91 +1,96 @@
-import { useState, useEffect, useCallback } from 'react'
-import type { JSX, ChangeEvent, FormEvent } from 'react'
-import type { FlowMetrics, SummaryMetrics, PopularRepo } from './types'
-import { Input } from './components/ui/Input'
-import { Button } from './components/ui/Button'
-import { FlowChart } from './components/FlowChart'
-import { StatCard } from './components/StatsCards'
-import { About } from './components/About'
-import { TrendDirection } from './types'
-import { parseGitHubUrl } from './utils/parser'
-import { fetchRepoMetrics, fetchPopularRepos } from './utils/api'
-import { Loader2, AlertCircle, Star } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react';
+import type { JSX, ChangeEvent, FormEvent } from 'react';
+import type { FlowMetrics, SummaryMetrics, PopularRepo } from './types';
+import { Input } from './components/ui/Input';
+import { Button } from './components/ui/Button';
+import { FlowChart } from './components/FlowChart';
+import { StatCard } from './components/StatsCards';
+import { About } from './components/About';
+import { TrendDirection } from './types';
+import { parseGitHubUrl } from './utils/parser';
+import { fetchRepoMetrics, fetchPopularRepos } from './utils/api';
+import { Loader2, AlertCircle, Star } from 'lucide-react';
 
 function App(): JSX.Element {
-  const [repoUrl, setRepoUrl] = useState<string>('')
-  const [data, setData] = useState<FlowMetrics[]>([])
-  const [summary, setSummary] = useState<SummaryMetrics | null>(null)
-  const [loading, setLoading] = useState<boolean>(true)
-  const [error, setError] = useState<string | null>(null)
-  const [popularRepos, setPopularRepos] = useState<PopularRepo[]>([])
-  const [isAboutOpen, setIsAboutOpen] = useState<boolean>(false)
+  const [repoUrl, setRepoUrl] = useState<string>('');
+  const [data, setData] = useState<FlowMetrics[]>([]);
+  const [summary, setSummary] = useState<SummaryMetrics | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [popularRepos, setPopularRepos] = useState<PopularRepo[]>([]);
+  const [isAboutOpen, setIsAboutOpen] = useState<boolean>(false);
 
   const fetchData = useCallback(async (url: string): Promise<void> => {
-    const repoDetails = parseGitHubUrl(url)
+    const repoDetails = parseGitHubUrl(url);
     if (!repoDetails) {
-      setError('Invalid GitHub URL. Please use format: https://github.com/owner/repo')
-      return
+      setError('Invalid GitHub URL. Please use format: https://github.com/owner/repo');
+      return;
     }
 
-    setLoading(true)
-    setError(null)
+    setLoading(true);
+    setError(null);
 
     try {
-      const response = await fetchRepoMetrics(repoDetails.owner, repoDetails.repo)
-      setData(response.time_series)
-      setSummary(response.summary)
-      setRepoUrl(url)
+      const response = await fetchRepoMetrics(repoDetails.owner, repoDetails.repo);
+      setData(response.time_series);
+      setSummary(response.summary);
+      setRepoUrl(url);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unknown error occurred')
+      setError(err instanceof Error ? err.message : 'An unknown error occurred');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [])
+  }, []);
 
   const handleSearch = (e: FormEvent): void => {
-    e.preventDefault()
-    fetchData(repoUrl)
-  }
+    e.preventDefault();
+    fetchData(repoUrl);
+  };
 
-  const handlePopularClick = useCallback((owner: string, repo: string): void => {
-    const url = `https://github.com/${owner}/${repo}`
-    fetchData(url)
-  }, [fetchData])
+  const handlePopularClick = useCallback(
+    (owner: string, repo: string): void => {
+      const url = `https://github.com/${owner}/${repo}`;
+      fetchData(url);
+    },
+    [fetchData],
+  );
 
   useEffect(() => {
     const init = async () => {
       try {
-        const popular = await fetchPopularRepos()
-        setPopularRepos(popular)
-        
+        const popular = await fetchPopularRepos();
+        setPopularRepos(popular);
+
         if (popular.length > 0) {
-          const defaultRepo = popular[0]
-          handlePopularClick(defaultRepo.owner, defaultRepo.repo)
+          const defaultRepo = popular[0];
+          handlePopularClick(defaultRepo.owner, defaultRepo.repo);
         }
       } catch (err) {
-        console.error('Failed to load popular repos', err)
+        console.error('Failed to load popular repos', err);
         // Fallback to a default if popular fetch fails
-        fetchData('https://github.com/facebook/react')
+        fetchData('https://github.com/facebook/react');
       }
-    }
-    init()
-  }, [fetchData, handlePopularClick])
+    };
+    init();
+  }, [fetchData, handlePopularClick]);
 
-  const hasData = data.some(day => day.opened > 0 || day.merged > 0)
+  const hasData = data.some((day) => day.opened > 0 || day.merged > 0);
 
   return (
     <div className="min-h-screen bg-bg p-8 font-sans selection:bg-main">
       <About isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} />
-      
+
       <header className="max-w-7xl mx-auto mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
-          <h1 className="text-6xl mb-2 italic tracking-tighter text-black font-black uppercase underline decoration-main decoration-8">RepoFlow</h1>
+          <h1 className="text-6xl mb-2 italic tracking-tighter text-black font-black uppercase underline decoration-main decoration-8">
+            RepoFlow
+          </h1>
           <p className="text-xl font-base">Measure OSS contribution efficiency.</p>
         </div>
-        
+
         <form onSubmit={handleSearch} className="flex gap-4 w-full md:w-auto">
-          <Input 
-            value={repoUrl} 
+          <Input
+            value={repoUrl}
             onChange={(e: ChangeEvent<HTMLInputElement>) => setRepoUrl(e.target.value)}
             placeholder="https://github.com/owner/repo"
             className="flex-grow md:w-96"
@@ -126,7 +131,9 @@ function App(): JSX.Element {
         )}
 
         {summary && (
-          <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 transition-opacity duration-300 ${loading ? 'opacity-50' : 'opacity-100'}`}>
+          <div
+            className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 transition-opacity duration-300 ${loading ? 'opacity-50' : 'opacity-100'}`}
+          >
             <StatCard
               label="PRs Opened (30d)"
               value={summary.current_opened}
@@ -156,11 +163,15 @@ function App(): JSX.Element {
           </div>
         )}
 
-        <div className={`transition-opacity duration-300 ${loading ? 'opacity-50' : 'opacity-100'}`}>
+        <div
+          className={`transition-opacity duration-300 ${loading ? 'opacity-50' : 'opacity-100'}`}
+        >
           {loading && data.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 border-4 border-dashed border-black rounded-none bg-white shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
-               <Loader2 className="animate-spin mb-4" size={48} />
-               <p className="font-heading text-xl uppercase tracking-widest">Fetching repo history...</p>
+              <Loader2 className="animate-spin mb-4" size={48} />
+              <p className="font-heading text-xl uppercase tracking-widest">
+                Fetching repo history...
+              </p>
             </div>
           ) : hasData ? (
             <FlowChart data={data} />
@@ -178,12 +189,19 @@ function App(): JSX.Element {
       <footer className="max-w-7xl mx-auto mt-12 pt-8 border-t-4 border-black font-base flex justify-between items-center">
         <p>RepoFlow - Measuring PR Liquidity</p>
         <div className="flex gap-6">
-          <a href="https://github.com/benbellick/RepoFlow" className="hover:underline font-heading">GitHub</a>
-          <button onClick={() => setIsAboutOpen(true)} className="hover:underline font-heading hover:bg-main px-2 -mx-2 transition-colors">About</button>
+          <a href="https://github.com/benbellick/RepoFlow" className="hover:underline font-heading">
+            GitHub
+          </a>
+          <button
+            onClick={() => setIsAboutOpen(true)}
+            className="hover:underline font-heading hover:bg-main px-2 -mx-2 transition-colors"
+          >
+            About
+          </button>
         </div>
       </footer>
     </div>
-  )
+  );
 }
 
-export default App
+export default App;

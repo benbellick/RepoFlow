@@ -4,7 +4,7 @@
 export const TrendDirection = {
   UP: 'up',
   DOWN: 'down',
-  NEUTRAL: 'neutral'
+  NEUTRAL: 'neutral',
 } as const;
 
 export type TrendDirection = (typeof TrendDirection)[keyof typeof TrendDirection];

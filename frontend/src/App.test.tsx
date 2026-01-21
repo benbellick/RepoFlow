@@ -7,14 +7,14 @@ describe('App', () => {
   it('shows no data message when metrics are empty', async () => {
     // Mock fetchRepoMetrics to return empty time_series and summary
     const fetchSpy = vi.spyOn(api, 'fetchRepoMetrics').mockResolvedValue({
-        time_series: [],
-        summary: {
-            current_opened: 0,
-            current_merged: 0,
-            current_spread: 0,
-            merge_rate: 0,
-            is_widening: false
-        }
+      time_series: [],
+      summary: {
+        current_opened: 0,
+        current_merged: 0,
+        current_spread: 0,
+        merge_rate: 0,
+        is_widening: false,
+      },
     });
 
     render(<App />);
@@ -26,7 +26,7 @@ describe('App', () => {
     fireEvent.click(button);
 
     await waitFor(() => {
-        expect(fetchSpy).toHaveBeenCalledWith('empty', 'repo');
+      expect(fetchSpy).toHaveBeenCalledWith('empty', 'repo');
     });
 
     const noDataMessage = await screen.findByText(/No data found/i);
