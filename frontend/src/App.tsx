@@ -50,7 +50,6 @@ function App(): JSX.Element {
     fetchData(url)
   }, [fetchData])
 
-  // Initial load
   useEffect(() => {
     const init = async () => {
       try {
