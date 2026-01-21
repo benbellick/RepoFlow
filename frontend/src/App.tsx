@@ -176,7 +176,7 @@ function App(): JSX.Element {
       </main>
 
       <footer className="max-w-7xl mx-auto mt-12 pt-8 border-t-4 border-black font-base flex justify-between items-center">
-        <p>© 2026 RepoFlow - Measuring PR Liquidity</p>
+        <p>RepoFlow - Measuring PR Liquidity</p>
         <div className="flex gap-6">
           <a href="https://github.com/benbellick/RepoFlow" className="hover:underline font-heading">GitHub</a>
           <button onClick={() => setIsAboutOpen(true)} className="hover:underline font-heading hover:bg-main px-2 -mx-2 transition-colors">About</button>
