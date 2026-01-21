@@ -33,7 +33,7 @@ export const About = ({ isOpen, onClose }: AboutProps): JSX.Element | null => {
           </p>
 
           <p>
-            We believe that a healthy project is defined by a balance between two forces:
+            A healthy project is defined by a balance between two forces:
           </p>
 
           <ul className="list-disc pl-6 space-y-2">
@@ -62,10 +62,6 @@ export const About = ({ isOpen, onClose }: AboutProps): JSX.Element | null => {
               </p>
             </div>
           </div>
-
-          <p>
-            Popularity is noise; <strong>Flow is signal.</strong>
-          </p>
         </div>
 
         <div className="mt-8 flex justify-end">
