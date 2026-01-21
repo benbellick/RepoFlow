@@ -147,6 +147,26 @@ async fn get_repo_metrics(
         .await
         .map_err(|e| {
             tracing::error!("Failed to fetch PRs for {}/{}: {}", owner, repo, e);
+
+            if let Some(octocrab::Error::GitHub { source, .. }) =
+                e.downcast_ref::<octocrab::Error>()
+            {
+                // TODO(#29): Refactor this brittle string matching.
+                // We should inspect the raw HTTP status code or use a strongly-typed error variant if available.
+                if source.message.to_lowercase().contains("rate limit") {
+                    return (
+                        axum::http::StatusCode::TOO_MANY_REQUESTS,
+                        "GitHub Rate Limit Exceeded".to_string(),
+                    );
+                }
+                if source.message.to_lowercase().contains("not found") {
+                    return (
+                        axum::http::StatusCode::NOT_FOUND,
+                        "Repository Not Found".to_string(),
+                    );
+                }
+            }
+
             (
                 axum::http::StatusCode::INTERNAL_SERVER_ERROR,
                 "Internal Server Error".to_string(),
@@ -164,7 +184,6 @@ async fn get_repo_metrics(
 
     Ok(Json(metrics))
 }
-
 fn get_cache_key(owner: &str, repo: &str) -> String {
     format!("owner::{}/repo::{}", owner, repo)
 }
