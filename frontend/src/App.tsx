@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import type { JSX, ChangeEvent, FormEvent } from 'react'
 import type { FlowMetrics, SummaryMetrics, PopularRepo } from './types'
 import { Input } from './components/ui/Input'
@@ -18,7 +18,7 @@ function App(): JSX.Element {
   const [error, setError] = useState<string | null>(null)
   const [popularRepos, setPopularRepos] = useState<PopularRepo[]>([])
 
-  const fetchData = async (url: string): Promise<void> => {
+  const fetchData = useCallback(async (url: string): Promise<void> => {
     const repoDetails = parseGitHubUrl(url)
     if (!repoDetails) {
       setError('Invalid GitHub URL. Please use format: https://github.com/owner/repo')
@@ -38,17 +38,17 @@ function App(): JSX.Element {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   const handleSearch = (e: FormEvent): void => {
     e.preventDefault()
     fetchData(repoUrl)
   }
 
-  const handlePopularClick = (owner: string, repo: string): void => {
+  const handlePopularClick = useCallback((owner: string, repo: string): void => {
     const url = `https://github.com/${owner}/${repo}`
     fetchData(url)
-  }
+  }, [fetchData])
 
   // Initial load
   useEffect(() => {
@@ -68,7 +68,7 @@ function App(): JSX.Element {
       }
     }
     init()
-  }, [])
+  }, [fetchData, handlePopularClick])
 
   const hasData = data.some(day => day.opened > 0 || day.merged > 0)
 
