@@ -16,7 +16,7 @@ pub struct RepoMetricsResponse {
 }
 
 /// Calculated summary statistics for the latest data point.
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Clone, Default)]
 pub struct SummaryMetrics {
     /// Number of PRs opened in the current rolling window.
     pub current_opened: usize,
@@ -86,7 +86,10 @@ pub fn calculate_metrics(
 
 /// Calculates the summary metrics based on the generated time series.
 fn calculate_summary(time_series: &[FlowMetricsResponse]) -> SummaryMetrics {
-    let latest = time_series.last().cloned().unwrap_or_default();
+    let Some(latest) = time_series.last() else {
+        return SummaryMetrics::default();
+    };
+
     let previous = time_series.iter().rev().nth(1);
 
     let merge_rate = if latest.opened > 0 {
@@ -180,5 +183,15 @@ mod tests {
         assert_eq!(response.summary.current_opened, 2);
         assert_eq!(response.summary.current_merged, 1);
         assert_eq!(response.summary.merge_rate, 50);
+    }
+
+    #[test]
+    fn test_calculate_summary_empty() {
+        let metrics = calculate_summary(&[]);
+        assert_eq!(metrics.current_opened, 0);
+        assert_eq!(metrics.current_merged, 0);
+        assert_eq!(metrics.current_spread, 0);
+        assert_eq!(metrics.merge_rate, 0);
+        assert_eq!(metrics.is_widening, false);
     }
 }
