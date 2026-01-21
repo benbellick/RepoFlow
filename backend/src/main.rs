@@ -96,7 +96,6 @@ async fn main() {
         metrics_cache,
     });
 
-    // Preload popular repos in the background
     let state_clone = state.clone();
     tokio::spawn(async move {
         preload_popular_repos(state_clone).await;
