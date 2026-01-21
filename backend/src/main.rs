@@ -1,3 +1,4 @@
+mod config;
 mod github;
 mod metrics;
 
@@ -7,43 +8,16 @@ use axum::{
     Json, Router,
 };
 use chrono::{Duration, Utc};
+use config::{AppConfig, PopularRepo};
 use futures::stream::{self, StreamExt};
 use github::GitHubClient;
 use moka::future::Cache;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::time::Duration as StdDuration;
 use tower_http::services::{ServeDir, ServeFile};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-
-/// Number of past days to fetch pull request data for from the GitHub API.
-const PR_FETCH_DAYS: i64 = 90;
-/// Hard limit on the number of paginated requests to make to the GitHub API per repository.
-const MAX_GITHUB_API_PAGES: u32 = 10;
-/// The number of individual data points (days) to return in the flow metrics response.
-const METRICS_DAYS_TO_DISPLAY: i64 = 30;
-/// The size of the trailing window (in days) used to calculate the rolling counts.
-const METRICS_WINDOW_SIZE: i64 = 30;
-/// Time to live for cached repository metrics (24 hours).
-/// Note: This long TTL reduces GitHub API load but may result in stale data.
-/// TODO(#15): Implement a more sophisticated cache invalidation or background refresh strategy.
-const CACHE_TTL: StdDuration = StdDuration::from_secs(86400);
-/// Maximum number of entries to keep in the metrics cache.
-const CACHE_MAX_CAPACITY: u64 = 1000;
-/// Maximum number of concurrent requests for preloading popular repositories.
-const MAX_CONCURRENT_PRELOADS: usize = 4;
-
-/// List of popular repositories to preload and display in the UI.
-const POPULAR_REPOS: &[(&str, &str)] = &[
-    ("facebook", "react"),
-    ("rust-lang", "rust"),
-    ("vercel", "next.js"),
-    ("tailwindlabs", "tailwindcss"),
-    ("microsoft", "vscode"),
-    ("rust-lang", "rust-analyzer"),
-];
 
 #[derive(Serialize)]
 struct HealthResponse {
@@ -52,18 +26,14 @@ struct HealthResponse {
     version: &'static str,
 }
 
-#[derive(Serialize, Clone)]
-struct PopularRepo {
-    owner: String,
-    repo: String,
-}
-
 /// Shared application state accessible to all request handlers.
 struct AppState {
     /// Thread-safe client for interacting with the GitHub API.
     github_client: GitHubClient,
     /// In-memory cache for repository metrics to avoid redundant API calls and processing.
     metrics_cache: Cache<String, metrics::RepoMetricsResponse>,
+    /// Application configuration loaded from environment variables.
+    config: AppConfig,
 }
 
 /// Parameters extracted from the URL path /api/repos/:owner/:repo/metrics
@@ -86,14 +56,17 @@ async fn main() {
         }
     };
 
+    let config = AppConfig::from_env();
+
     let metrics_cache = Cache::builder()
-        .max_capacity(CACHE_MAX_CAPACITY)
-        .time_to_live(CACHE_TTL)
+        .max_capacity(config.cache_max_capacity)
+        .time_to_live(config.cache_ttl)
         .build();
 
     let state = Arc::new(AppState {
         github_client,
         metrics_cache,
+        config,
     });
 
     let state_clone = state.clone();
@@ -155,15 +128,8 @@ async fn health_check() -> Json<HealthResponse> {
     })
 }
 
-async fn get_popular_repos() -> Json<Vec<PopularRepo>> {
-    let repos = POPULAR_REPOS
-        .iter()
-        .map(|(owner, repo)| PopularRepo {
-            owner: owner.to_string(),
-            repo: repo.to_string(),
-        })
-        .collect();
-    Json(repos)
+async fn get_popular_repos(State(state): State<Arc<AppState>>) -> Json<Vec<PopularRepo>> {
+    Json(state.config.popular_repos.clone())
 }
 
 async fn get_repo_metrics(
@@ -191,7 +157,12 @@ async fn fetch_and_calculate_metrics(
 ) -> Result<metrics::RepoMetricsResponse, (axum::http::StatusCode, String)> {
     let prs = state
         .github_client
-        .fetch_pull_requests(owner, repo, PR_FETCH_DAYS, MAX_GITHUB_API_PAGES)
+        .fetch_pull_requests(
+            owner,
+            repo,
+            state.config.pr_fetch_days,
+            state.config.max_github_api_pages,
+        )
         .await
         .map_err(|e| {
             tracing::error!("Failed to fetch PRs for {}/{}: {}", owner, repo, e);
@@ -223,8 +194,8 @@ async fn fetch_and_calculate_metrics(
 
     let metrics = metrics::calculate_metrics(
         &prs,
-        Duration::days(METRICS_DAYS_TO_DISPLAY),
-        Duration::days(METRICS_WINDOW_SIZE),
+        Duration::days(state.config.metrics_days_to_display),
+        Duration::days(state.config.metrics_window_size),
         Utc::now(),
     );
 
@@ -232,15 +203,22 @@ async fn fetch_and_calculate_metrics(
 }
 
 async fn preload_popular_repos(state: Arc<AppState>) {
-    tracing::info!("Preloading {} popular repositories", POPULAR_REPOS.len());
+    tracing::info!(
+        "Preloading {} popular repositories",
+        state.config.popular_repos.len()
+    );
 
-    stream::iter(POPULAR_REPOS)
-        .for_each_concurrent(MAX_CONCURRENT_PRELOADS, |&(owner, repo)| {
-            let state = state.clone();
-            async move {
-                preload_single_repo(&state, owner, repo).await;
-            }
-        })
+    let repos = state.config.popular_repos.clone();
+    stream::iter(repos)
+        .for_each_concurrent(
+            state.config.max_concurrent_preloads,
+            |repo| {
+                let state = state.clone();
+                async move {
+                    preload_single_repo(&state, &repo.owner, &repo.repo).await;
+                }
+            },
+        )
         .await;
 
     tracing::info!("Finished preloading popular repositories");
