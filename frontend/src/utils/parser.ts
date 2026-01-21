@@ -14,12 +14,12 @@ export interface RepoDetails {
  */
 export const parseGitHubUrl = (url: string): RepoDetails | null => {
   try {
-    const cleanUrl = url.trim().replace(/\/$/, '');
+    const cleanUrl = url.trim().replace(/\/$/, "");
     const urlObj = new URL(cleanUrl);
 
-    if (urlObj.hostname !== 'github.com') return null;
+    if (urlObj.hostname !== "github.com") return null;
 
-    const parts = urlObj.pathname.split('/').filter(Boolean);
+    const parts = urlObj.pathname.split("/").filter(Boolean);
     if (parts.length < 2) return null;
 
     return {

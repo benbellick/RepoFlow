@@ -1,20 +1,20 @@
-@import 'tailwindcss';
+@import "tailwindcss";
 @config "../tailwind.config.js";
 
 @theme {
   --font-sans:
-    ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
-    'Noto Color Emoji';
+    ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
+    "Segoe UI Symbol", "Noto Color Emoji";
   --font-heading:
-    ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
-    'Noto Color Emoji';
+    ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
+    "Segoe UI Symbol", "Noto Color Emoji";
 }
 
 /* Custom base styles */
 body {
-  background-color: theme('colors.bg');
-  color: theme('colors.text');
-  font-family: theme('fontFamily.sans');
+  background-color: theme("colors.bg");
+  color: theme("colors.text");
+  font-family: theme("fontFamily.sans");
 }
 
 h1,
@@ -23,6 +23,6 @@ h3,
 h4,
 h5,
 h6 {
-  font-family: theme('fontFamily.heading');
-  font-weight: theme('fontWeight.heading');
+  font-family: theme("fontFamily.heading");
+  font-weight: theme("fontWeight.heading");
 }

@@ -1,18 +1,18 @@
-import { useState, useEffect, useCallback } from 'react';
-import type { JSX, ChangeEvent, FormEvent } from 'react';
-import type { FlowMetrics, SummaryMetrics, PopularRepo } from './types';
-import { Input } from './components/ui/Input';
-import { Button } from './components/ui/Button';
-import { FlowChart } from './components/FlowChart';
-import { StatCard } from './components/StatsCards';
-import { About } from './components/About';
-import { TrendDirection } from './types';
-import { parseGitHubUrl } from './utils/parser';
-import { fetchRepoMetrics, fetchPopularRepos } from './utils/api';
-import { Loader2, AlertCircle, Star } from 'lucide-react';
+import { useState, useEffect, useCallback } from "react";
+import type { JSX, ChangeEvent, FormEvent } from "react";
+import type { FlowMetrics, SummaryMetrics, PopularRepo } from "./types";
+import { Input } from "./components/ui/Input";
+import { Button } from "./components/ui/Button";
+import { FlowChart } from "./components/FlowChart";
+import { StatCard } from "./components/StatsCards";
+import { About } from "./components/About";
+import { TrendDirection } from "./types";
+import { parseGitHubUrl } from "./utils/parser";
+import { fetchRepoMetrics, fetchPopularRepos } from "./utils/api";
+import { Loader2, AlertCircle, Star } from "lucide-react";
 
 function App(): JSX.Element {
-  const [repoUrl, setRepoUrl] = useState<string>('');
+  const [repoUrl, setRepoUrl] = useState<string>("");
   const [data, setData] = useState<FlowMetrics[]>([]);
   const [summary, setSummary] = useState<SummaryMetrics | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -23,7 +23,9 @@ function App(): JSX.Element {
   const fetchData = useCallback(async (url: string): Promise<void> => {
     const repoDetails = parseGitHubUrl(url);
     if (!repoDetails) {
-      setError('Invalid GitHub URL. Please use format: https://github.com/owner/repo');
+      setError(
+        "Invalid GitHub URL. Please use format: https://github.com/owner/repo",
+      );
       return;
     }
 
@@ -31,12 +33,17 @@ function App(): JSX.Element {
     setError(null);
 
     try {
-      const response = await fetchRepoMetrics(repoDetails.owner, repoDetails.repo);
+      const response = await fetchRepoMetrics(
+        repoDetails.owner,
+        repoDetails.repo,
+      );
       setData(response.time_series);
       setSummary(response.summary);
       setRepoUrl(url);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unknown error occurred');
+      setError(
+        err instanceof Error ? err.message : "An unknown error occurred",
+      );
     } finally {
       setLoading(false);
     }
@@ -66,9 +73,9 @@ function App(): JSX.Element {
           handlePopularClick(defaultRepo.owner, defaultRepo.repo);
         }
       } catch (err) {
-        console.error('Failed to load popular repos', err);
+        console.error("Failed to load popular repos", err);
         // Fallback to a default if popular fetch fails
-        fetchData('https://github.com/facebook/react');
+        fetchData("https://github.com/facebook/react");
       }
     };
     init();
@@ -85,17 +92,24 @@ function App(): JSX.Element {
           <h1 className="text-6xl mb-2 italic tracking-tighter text-black font-black uppercase underline decoration-main decoration-8">
             RepoFlow
           </h1>
-          <p className="text-xl font-base">Measure OSS contribution efficiency.</p>
+          <p className="text-xl font-base">
+            Measure OSS contribution efficiency.
+          </p>
         </div>
 
         <form onSubmit={handleSearch} className="flex gap-4 w-full md:w-auto">
           <Input
             value={repoUrl}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => setRepoUrl(e.target.value)}
+            onChange={(e: ChangeEvent<HTMLInputElement>) =>
+              setRepoUrl(e.target.value)
+            }
             placeholder="https://github.com/owner/repo"
             className="flex-grow md:w-96"
           />
-          <Button type="submit" className="flex items-center gap-2 min-w-[140px] justify-center">
+          <Button
+            type="submit"
+            className="flex items-center gap-2 min-w-[140px] justify-center"
+          >
             Analyze
           </Button>
         </form>
@@ -105,7 +119,9 @@ function App(): JSX.Element {
         <section className="mb-12">
           <div className="flex items-center gap-2 mb-4">
             <Star className="text-black fill-main" size={24} />
-            <h2 className="text-2xl font-black uppercase tracking-tight">Popular Repositories</h2>
+            <h2 className="text-2xl font-black uppercase tracking-tight">
+              Popular Repositories
+            </h2>
           </div>
           <div className="flex flex-wrap gap-3">
             {popularRepos.map((pr) => (
@@ -132,7 +148,7 @@ function App(): JSX.Element {
 
         {summary && (
           <div
-            className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 transition-opacity duration-300 ${loading ? 'opacity-50' : 'opacity-100'}`}
+            className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 transition-opacity duration-300 ${loading ? "opacity-50" : "opacity-100"}`}
           >
             <StatCard
               label="PRs Opened (30d)"
@@ -149,8 +165,10 @@ function App(): JSX.Element {
             <StatCard
               label="The Spread"
               value={summary.current_spread}
-              trend={summary.is_widening ? TrendDirection.UP : TrendDirection.DOWN}
-              trendLabel={summary.is_widening ? 'Widening' : 'Tightening'}
+              trend={
+                summary.is_widening ? TrendDirection.UP : TrendDirection.DOWN
+              }
+              trendLabel={summary.is_widening ? "Widening" : "Tightening"}
               color="bg-main"
               description="Difference between opened and merged PRs. A widening spread means the backlog is growing."
             />
@@ -164,7 +182,7 @@ function App(): JSX.Element {
         )}
 
         <div
-          className={`transition-opacity duration-300 ${loading ? 'opacity-50' : 'opacity-100'}`}
+          className={`transition-opacity duration-300 ${loading ? "opacity-50" : "opacity-100"}`}
         >
           {loading && data.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 border-4 border-dashed border-black rounded-none bg-white shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
@@ -179,7 +197,8 @@ function App(): JSX.Element {
             <div className="border-4 border-black bg-white p-12 text-center shadow-base">
               <h2 className="text-3xl font-heading mb-4">No Data Found</h2>
               <p className="text-xl font-base text-gray-600">
-                We couldn't find any pull requests for this repository in the analyzed time period.
+                We couldn't find any pull requests for this repository in the
+                analyzed time period.
               </p>
             </div>
           )}
@@ -189,7 +208,10 @@ function App(): JSX.Element {
       <footer className="max-w-7xl mx-auto mt-12 pt-8 border-t-4 border-black font-base flex justify-between items-center">
         <p>RepoFlow - Measuring PR Liquidity</p>
         <div className="flex gap-6">
-          <a href="https://github.com/benbellick/RepoFlow" className="hover:underline font-heading">
+          <a
+            href="https://github.com/benbellick/RepoFlow"
+            className="hover:underline font-heading"
+          >
             GitHub
           </a>
           <button

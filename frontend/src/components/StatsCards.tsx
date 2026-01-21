@@ -1,7 +1,7 @@
-import type { JSX } from 'react';
-import { Card } from './ui/Card';
-import { ArrowUpRight, ArrowDownRight, Minus, Info } from 'lucide-react';
-import { TrendDirection } from '../types';
+import type { JSX } from "react";
+import { Card } from "./ui/Card";
+import { ArrowUpRight, ArrowDownRight, Minus, Info } from "lucide-react";
+import { TrendDirection } from "../types";
 
 /**
  * Props for the StatCard component.
@@ -29,7 +29,7 @@ export const StatCard = ({
   value,
   trend,
   trendLabel,
-  color = 'bg-white',
+  color = "bg-white",
   description,
 }: StatCardProps): JSX.Element => {
   const renderTrendIcon = (): JSX.Element | null => {

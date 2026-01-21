@@ -1,4 +1,4 @@
-import type { RepoMetricsResponse, PopularRepo } from '../types';
+import type { RepoMetricsResponse, PopularRepo } from "../types";
 
 /**
  * Fetches repository metrics from the Rust backend API.
@@ -17,10 +17,12 @@ export const fetchRepoMetrics = async (
 
   if (!response.ok) {
     if (response.status === 404) {
-      throw new Error('Repository not found or no metrics available.');
+      throw new Error("Repository not found or no metrics available.");
     }
     const errorText = await response.text();
-    throw new Error(errorText || `Failed to fetch metrics: ${response.statusText}`);
+    throw new Error(
+      errorText || `Failed to fetch metrics: ${response.statusText}`,
+    );
   }
 
   return response.json();
@@ -31,7 +33,7 @@ export const fetchRepoMetrics = async (
  * @returns A promise that resolves to an array of PopularRepo objects.
  */
 export const fetchPopularRepos = async (): Promise<PopularRepo[]> => {
-  const response = await fetch('/api/repos/popular');
+  const response = await fetch("/api/repos/popular");
 
   if (!response.ok) {
     throw new Error(`Failed to fetch popular repos: ${response.statusText}`);

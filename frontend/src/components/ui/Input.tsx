@@ -1,5 +1,5 @@
-import type { ChangeEvent, JSX } from 'react';
-import { cn } from '../../utils/utils';
+import type { ChangeEvent, JSX } from "react";
+import { cn } from "../../utils/utils";
 
 /**
  * Props for the Input component.
@@ -19,14 +19,19 @@ interface InputProps {
  * A styled text input component.
  * Features a thick border and distinct focus state.
  */
-export const Input = ({ value, onChange, placeholder, className }: InputProps): JSX.Element => (
+export const Input = ({
+  value,
+  onChange,
+  placeholder,
+  className,
+}: InputProps): JSX.Element => (
   <input
     type="text"
     value={value}
     onChange={onChange}
     placeholder={placeholder}
     className={cn(
-      'border-4 border-black bg-white px-4 py-3 font-base text-lg outline-none focus:ring-2 focus:ring-mainAccent transition-all',
+      "border-4 border-black bg-white px-4 py-3 font-base text-lg outline-none focus:ring-2 focus:ring-mainAccent transition-all",
       className,
     )}
   />
