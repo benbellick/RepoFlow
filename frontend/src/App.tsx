@@ -1,21 +1,22 @@
 import { useState, useEffect } from 'react'
 import type { JSX, ChangeEvent, FormEvent } from 'react'
-import type { FlowMetrics, SummaryMetrics } from './types'
+import type { FlowMetrics, SummaryMetrics, PopularRepo } from './types'
 import { Input } from './components/ui/Input'
 import { Button } from './components/ui/Button'
 import { FlowChart } from './components/FlowChart'
 import { StatCard } from './components/StatsCards'
 import { TrendDirection } from './types'
 import { parseGitHubUrl } from './utils/parser'
-import { fetchRepoMetrics } from './utils/api'
-import { Loader2, AlertCircle } from 'lucide-react'
+import { fetchRepoMetrics, fetchPopularRepos } from './utils/api'
+import { Loader2, AlertCircle, Star } from 'lucide-react'
 
 function App(): JSX.Element {
-  const [repoUrl, setRepoUrl] = useState<string>('https://github.com/facebook/react')
+  const [repoUrl, setRepoUrl] = useState<string>('')
   const [data, setData] = useState<FlowMetrics[]>([])
   const [summary, setSummary] = useState<SummaryMetrics | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
+  const [popularRepos, setPopularRepos] = useState<PopularRepo[]>([])
 
   const fetchData = async (url: string): Promise<void> => {
     const repoDetails = parseGitHubUrl(url)
@@ -31,6 +32,7 @@ function App(): JSX.Element {
       const response = await fetchRepoMetrics(repoDetails.owner, repoDetails.repo)
       setData(response.time_series)
       setSummary(response.summary)
+      setRepoUrl(url)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred')
     } finally {
@@ -43,9 +45,29 @@ function App(): JSX.Element {
     fetchData(repoUrl)
   }
 
-  // Load initial data for React
+  const handlePopularClick = (owner: string, repo: string): void => {
+    const url = `https://github.com/${owner}/${repo}`
+    fetchData(url)
+  }
+
+  // Initial load
   useEffect(() => {
-    fetchData('https://github.com/facebook/react')
+    const init = async () => {
+      try {
+        const popular = await fetchPopularRepos()
+        setPopularRepos(popular)
+        
+        if (popular.length > 0) {
+          const defaultRepo = popular[0]
+          handlePopularClick(defaultRepo.owner, defaultRepo.repo)
+        }
+      } catch (err) {
+        console.error('Failed to load popular repos', err)
+        // Fallback to a default if popular fetch fails
+        fetchData('https://github.com/facebook/react')
+      }
+    }
+    init()
   }, [])
 
   return (
@@ -70,6 +92,27 @@ function App(): JSX.Element {
       </header>
 
       <main className="max-w-7xl mx-auto">
+        <section className="mb-12">
+          <div className="flex items-center gap-2 mb-4">
+            <Star className="text-black fill-main" size={24} />
+            <h2 className="text-2xl font-black uppercase tracking-tight">Popular Repositories</h2>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            {popularRepos.map((pr) => (
+              <button
+                key={`${pr.owner}/${pr.repo}`}
+                onClick={() => handlePopularClick(pr.owner, pr.repo)}
+                className="px-4 py-2 border-2 border-black bg-white font-heading hover:bg-main hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-x-[0px] active:translate-y-[0px] active:shadow-none transition-all"
+              >
+                {pr.owner}/{pr.repo}
+              </button>
+            ))}
+            {popularRepos.length === 0 && !loading && (
+              <p className="italic text-gray-600">No popular repos loaded.</p>
+            )}
+          </div>
+        </section>
+
         {error && (
           <div className="mb-8 border-4 border-black bg-red-400 p-4 flex items-center gap-3 font-heading shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
             <AlertCircle size={24} />

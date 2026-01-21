@@ -32,11 +32,27 @@ const CACHE_TTL: StdDuration = StdDuration::from_secs(86400);
 /// Maximum number of entries to keep in the metrics cache.
 const CACHE_MAX_CAPACITY: u64 = 1000;
 
+/// List of popular repositories to preload and display in the UI.
+const POPULAR_REPOS: &[(&str, &str)] = &[
+    ("facebook", "react"),
+    ("rust-lang", "rust"),
+    ("vercel", "next.js"),
+    ("tailwindlabs", "tailwindcss"),
+    ("microsoft", "vscode"),
+    ("rust-lang", "rust-analyzer"),
+];
+
 #[derive(Serialize)]
 struct HealthResponse {
     status: &'static str,
     service: &'static str,
     version: &'static str,
+}
+
+#[derive(Serialize, Clone)]
+struct PopularRepo {
+    owner: String,
+    repo: String,
 }
 
 /// Shared application state accessible to all request handlers.
@@ -77,10 +93,17 @@ async fn main() {
         metrics_cache,
     });
 
+    // Preload popular repos in the background
+    let state_clone = state.clone();
+    tokio::spawn(async move {
+        preload_popular_repos(state_clone).await;
+    });
+
     let serve_dir = ServeDir::new("dist").not_found_service(ServeFile::new("dist/index.html"));
 
     let app = Router::new()
         .route("/api/health", get(health_check))
+        .route("/api/repos/popular", get(get_popular_repos))
         .route("/api/repos/{owner}/{repo}/metrics", get(get_repo_metrics))
         .fallback_service(serve_dir)
         .layer(TraceLayer::new_for_http())
@@ -130,6 +153,17 @@ async fn health_check() -> Json<HealthResponse> {
     })
 }
 
+async fn get_popular_repos() -> Json<Vec<PopularRepo>> {
+    let repos = POPULAR_REPOS
+        .iter()
+        .map(|(owner, repo)| PopularRepo {
+            owner: owner.to_string(),
+            repo: repo.to_string(),
+        })
+        .collect();
+    Json(repos)
+}
+
 async fn get_repo_metrics(
     Path(RepoPath { owner, repo }): Path<RepoPath>,
     State(state): State<Arc<AppState>>,
@@ -141,9 +175,21 @@ async fn get_repo_metrics(
         return Ok(Json(cached_metrics));
     }
 
+    let metrics = fetch_and_calculate_metrics(&state, &owner, &repo).await?;
+
+    state.metrics_cache.insert(cache_key, metrics.clone()).await;
+
+    Ok(Json(metrics))
+}
+
+async fn fetch_and_calculate_metrics(
+    state: &AppState,
+    owner: &str,
+    repo: &str,
+) -> Result<metrics::RepoMetricsResponse, (axum::http::StatusCode, String)> {
     let prs = state
         .github_client
-        .fetch_pull_requests(&owner, &repo, PR_FETCH_DAYS, MAX_GITHUB_API_PAGES)
+        .fetch_pull_requests(owner, repo, PR_FETCH_DAYS, MAX_GITHUB_API_PAGES)
         .await
         .map_err(|e| {
             tracing::error!("Failed to fetch PRs for {}/{}: {}", owner, repo, e);
@@ -160,9 +206,24 @@ async fn get_repo_metrics(
         Utc::now(),
     );
 
-    state.metrics_cache.insert(cache_key, metrics.clone()).await;
+    Ok(metrics)
+}
 
-    Ok(Json(metrics))
+async fn preload_popular_repos(state: Arc<AppState>) {
+    tracing::info!("Preloading {} popular repositories", POPULAR_REPOS.len());
+    for (owner, repo) in POPULAR_REPOS {
+        let cache_key = get_cache_key(owner, repo);
+        match fetch_and_calculate_metrics(&state, owner, repo).await {
+            Ok(metrics) => {
+                state.metrics_cache.insert(cache_key, metrics).await;
+                tracing::info!(owner = %owner, repo = %repo, "Preloaded metrics");
+            }
+            Err((status, msg)) => {
+                tracing::warn!(owner = %owner, repo = %repo, status = ?status, msg = %msg, "Failed to preload metrics");
+            }
+        }
+    }
+    tracing::info!("Finished preloading popular repositories");
 }
 
 fn get_cache_key(owner: &str, repo: &str) -> String {

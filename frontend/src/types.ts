@@ -37,3 +37,11 @@ export interface RepoMetricsResponse {
   summary: SummaryMetrics;
   time_series: FlowMetrics[];
 }
+
+/**
+ * Represents a popular repository returned by the backend.
+ */
+export interface PopularRepo {
+  owner: string;
+  repo: string;
+}
