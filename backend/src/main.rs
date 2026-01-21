@@ -56,11 +56,17 @@ async fn main() {
         }
     };
 
-    let config = AppConfig::from_env();
+    let config = match AppConfig::from_env() {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::error!("Failed to load configuration: {}. Exiting.", e);
+            std::process::exit(1);
+        }
+    };
 
     let metrics_cache = Cache::builder()
         .max_capacity(config.cache_max_capacity)
-        .time_to_live(config.cache_ttl)
+        .time_to_live(config.cache_ttl())
         .build();
 
     let state = Arc::new(AppState {
