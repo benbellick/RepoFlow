@@ -220,8 +220,7 @@ async fn preload_popular_repos(state: Arc<AppState>) {
         state.config.popular_repos.len()
     );
 
-    let repos = state.config.popular_repos.clone();
-    stream::iter(repos)
+    stream::iter(&state.config.popular_repos)
         .for_each_concurrent(state.config.max_concurrent_preloads, |repo| {
             let state = state.clone();
             async move {
