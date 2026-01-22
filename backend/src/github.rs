@@ -74,29 +74,44 @@ impl GitHubClient {
         let cutoff_date = Utc::now() - chrono::Duration::days(days);
         let mut prs = Vec::new();
 
-        let mut current_page = self
-            .octocrab
-            .pulls(owner, repo)
-            .list()
-            .state(octocrab::params::State::All)
-            .sort(octocrab::params::pulls::Sort::Created)
-            .direction(octocrab::params::Direction::Descending)
-            .per_page(100)
-            .send()
-            .await?;
+        use futures::StreamExt;
 
-        for _ in 1..=max_pages {
-            let page_prs = self.process_pr_page(&current_page);
-            prs.extend(page_prs);
+        let mut stream = futures::stream::iter(1..=max_pages)
+            .map(|page_num| {
+                let client = self.clone();
+                let owner = owner.to_string();
+                let repo = repo.to_string();
+                async move {
+                    client
+                        .octocrab
+                        .pulls(owner, repo)
+                        .list()
+                        .state(octocrab::params::State::All)
+                        .sort(octocrab::params::pulls::Sort::Created)
+                        .direction(octocrab::params::Direction::Descending)
+                        .per_page(100)
+                        .page(page_num)
+                        .send()
+                        .await
+                }
+            })
+            .buffered(5); // Concurrency limit of 5
 
-            // If the last PR we just added is older than the cutoff, we can stop.
-            if prs.last().is_some_and(|pr| pr.created_at < cutoff_date) {
+        while let Some(result) = stream.next().await {
+            let page = result?;
+            let page_prs = self.process_pr_page(&page);
+
+            // If the page is empty, we are done.
+            if page_prs.is_empty() {
                 break;
             }
 
-            if let Some(next_page) = self.octocrab.get_page(&current_page.next).await? {
-                current_page = next_page;
-            } else {
+            prs.extend(page_prs);
+
+            // If the last PR we just added is older than the cutoff, we can stop.
+            // Note: Since we process pages in order (buffered preserves order),
+            // if we hit the cutoff here, we can safely stop.
+            if prs.last().is_some_and(|pr| pr.created_at < cutoff_date) {
                 break;
             }
         }
