@@ -3,7 +3,7 @@ import { fetchRepoMetrics } from './api'
 
 describe('fetchRepoMetrics', () => {
   const fetchSpy = vi.fn()
-  global.fetch = fetchSpy
+  vi.stubGlobal('fetch', fetchSpy)
 
   afterEach(() => {
     fetchSpy.mockReset()
