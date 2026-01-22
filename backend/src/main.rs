@@ -45,21 +45,27 @@ struct RepoPath {
 
 #[tokio::main]
 async fn main() {
-    init_tracing();
+    // Load environment variables from .env file if it exists
+    dotenvy::dotenv().ok();
 
-    let github_token = std::env::var("GITHUB_TOKEN").ok();
-    let github_client = match GitHubClient::new(github_token) {
-        Ok(client) => client,
-        Err(e) => {
-            tracing::error!("Failed to initialize GitHub client: {}. Exiting.", e);
-            std::process::exit(1);
-        }
-    };
+    init_tracing();
 
     let config = match AppConfig::from_env() {
         Ok(c) => c,
         Err(e) => {
             tracing::error!("Failed to load configuration: {}. Exiting.", e);
+            std::process::exit(1);
+        }
+    };
+
+    if config.github_token.is_none() {
+        tracing::warn!("Running without GITHUB_TOKEN. Rate limits will be strict.");
+    }
+
+    let github_client = match GitHubClient::new(config.github_token.clone()) {
+        Ok(client) => client,
+        Err(e) => {
+            tracing::error!("Failed to initialize GitHub client: {}. Exiting.", e);
             std::process::exit(1);
         }
     };

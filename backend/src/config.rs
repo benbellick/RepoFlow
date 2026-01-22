@@ -20,6 +20,8 @@ pub struct AppConfig {
 
     #[serde(deserialize_with = "deserialize_popular_repos")]
     pub popular_repos: Vec<PopularRepo>,
+
+    pub github_token: Option<String>,
 }
 
 impl AppConfig {
