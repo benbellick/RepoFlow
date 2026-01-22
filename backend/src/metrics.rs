@@ -1,5 +1,5 @@
 use crate::github::GitHubPR;
-use chrono::{DateTime, Datelike, Duration, TimeZone, Utc};
+use chrono::{DateTime, Datelike, Duration, NaiveDate, TimeZone, Utc};
 use serde::Serialize;
 
 const END_OF_DAY_HOUR: u32 = 23;
@@ -56,10 +56,41 @@ pub fn calculate_metrics(
     window_size: Duration,
     now: DateTime<Utc>,
 ) -> RepoMetricsResponse {
-    let time_series: Vec<FlowMetricsResponse> = (0..=days_to_display.num_days())
+    let days_to_display_count = days_to_display.num_days();
+    let window_size_days = window_size.num_days();
+
+    // Determine the date range we need to cover.
+    let latest_date = now.date_naive();
+    let oldest_display_date = latest_date - Duration::days(days_to_display_count);
+    let start_date = oldest_display_date - Duration::days(window_size_days);
+
+    // Initialize timelines for opened and merged events.
+    let mut opened_timeline = Timeline::new(start_date, latest_date);
+    let mut merged_timeline = Timeline::new(start_date, latest_date);
+
+    // Populate timelines in a single pass.
+    for pr in prs {
+        opened_timeline.increment(pr.created_at.date_naive());
+        if let Some(merged_at) = pr.merged_at {
+            merged_timeline.increment(merged_at.date_naive());
+        }
+    }
+
+    // Convert to prefix sums for O(1) range queries.
+    let opened_prefix = opened_timeline.into_prefix_sums();
+    let merged_prefix = merged_timeline.into_prefix_sums();
+
+    // Generate the result time series.
+    let time_series: Vec<FlowMetricsResponse> = (0..=days_to_display_count)
         .rev()
         .map(|i| {
             let date = now - Duration::days(i);
+            let date_naive = date.date_naive();
+
+            // Calculate rolling window sums using the prefix timelines.
+            let opened = opened_prefix.sum_in_window(date_naive, window_size_days);
+            let merged = merged_prefix.sum_in_window(date_naive, window_size_days);
+
             // We set the time to the end of the day to ensure we capture all activity for that date.
             let target_date = Utc
                 .with_ymd_and_hms(
@@ -72,7 +103,12 @@ pub fn calculate_metrics(
                 )
                 .unwrap();
 
-            calculate_day_metrics(prs, target_date, window_size)
+            FlowMetricsResponse {
+                date: target_date.format("%Y-%m-%d").to_string(),
+                opened,
+                merged,
+                spread: opened as i64 - merged as i64,
+            }
         })
         .collect();
 
@@ -81,6 +117,89 @@ pub fn calculate_metrics(
     RepoMetricsResponse {
         summary,
         time_series,
+    }
+}
+
+/// Helper struct to manage daily event counts over a date range.
+struct Timeline {
+    start_date: NaiveDate,
+    end_date: NaiveDate,
+    counts: Vec<usize>,
+}
+
+impl Timeline {
+    fn new(start_date: NaiveDate, end_date: NaiveDate) -> Self {
+        let days = (end_date - start_date).num_days();
+        let size = if days >= 0 { (days + 1) as usize } else { 0 };
+        Self {
+            start_date,
+            end_date,
+            counts: vec![0; size],
+        }
+    }
+
+    fn increment(&mut self, date: NaiveDate) {
+        if date >= self.start_date && date <= self.end_date {
+            let idx = (date - self.start_date).num_days() as usize;
+            if idx < self.counts.len() {
+                self.counts[idx] += 1;
+            }
+        }
+    }
+
+    fn into_prefix_sums(self) -> PrefixTimeline {
+        let mut prefix_counts = Vec::with_capacity(self.counts.len());
+        let mut sum = 0;
+        for count in self.counts {
+            sum += count;
+            prefix_counts.push(sum);
+        }
+        PrefixTimeline {
+            start_date: self.start_date,
+            prefix_counts,
+        }
+    }
+}
+
+/// Helper struct to perform O(1) range sum queries using prefix sums.
+struct PrefixTimeline {
+    start_date: NaiveDate,
+    prefix_counts: Vec<usize>,
+}
+
+impl PrefixTimeline {
+    /// Returns the sum of events in the window (end_date - window_size, end_date].
+    fn sum_in_window(&self, end_date: NaiveDate, window_size_days: i64) -> usize {
+        let end_idx_signed = (end_date - self.start_date).num_days();
+
+        // If the query date is before our start date, we have no data.
+        if end_idx_signed < 0 {
+            return 0;
+        }
+
+        let end_idx = end_idx_signed as usize;
+        // Ensure we don't go out of bounds (though valid logic shouldn't).
+        let end_val = if end_idx < self.prefix_counts.len() {
+            self.prefix_counts[end_idx]
+        } else {
+            *self.prefix_counts.last().unwrap_or(&0)
+        };
+
+        // window start index = end_idx - window_size
+        let start_idx_signed = end_idx_signed - window_size_days;
+
+        let start_val = if start_idx_signed < 0 {
+            0
+        } else {
+            let idx = start_idx_signed as usize;
+             if idx < self.prefix_counts.len() {
+                self.prefix_counts[idx]
+            } else {
+                *self.prefix_counts.last().unwrap_or(&0)
+            }
+        };
+
+        end_val.saturating_sub(start_val)
     }
 }
 
@@ -106,35 +225,6 @@ fn calculate_summary(time_series: &[FlowMetricsResponse]) -> SummaryMetrics {
         current_spread: latest.spread,
         merge_rate,
         is_widening,
-    }
-}
-
-/// Calculates opened and merged metrics for a single point in time using a rolling window.
-fn calculate_day_metrics(
-    prs: &[GitHubPR],
-    target_date: DateTime<Utc>,
-    window_size: Duration,
-) -> FlowMetricsResponse {
-    let window_start = target_date - window_size;
-
-    let opened = prs
-        .iter()
-        .filter(|pr| pr.created_at >= window_start && pr.created_at <= target_date)
-        .count();
-
-    let merged = prs
-        .iter()
-        .filter(|pr| {
-            pr.merged_at
-                .is_some_and(|merged_at| merged_at >= window_start && merged_at <= target_date)
-        })
-        .count();
-
-    FlowMetricsResponse {
-        date: target_date.format("%Y-%m-%d").to_string(),
-        opened,
-        merged,
-        spread: opened as i64 - merged as i64,
     }
 }
 
@@ -194,4 +284,5 @@ mod tests {
         assert_eq!(metrics.merge_rate, 0);
         assert_eq!(metrics.is_widening, false);
     }
+
 }
