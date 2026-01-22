@@ -10,8 +10,8 @@ use chrono::{Duration, Utc};
 use futures::stream::{self, StreamExt};
 use github::GitHubClient;
 use moka::future::Cache;
-use serde::{Deserialize, Serialize};
 use moka::notification::RemovalCause;
+use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration as StdDuration;
@@ -116,11 +116,20 @@ async fn main() {
                 tracing::info!("Refreshing expired metrics for {}/{}", owner, repo);
                 match fetch_and_calculate_metrics(&refresh_state, &owner, &repo).await {
                     Ok(metrics) => {
-                        refresh_state.metrics_cache.insert(key.to_string(), metrics).await;
+                        refresh_state
+                            .metrics_cache
+                            .insert(key.to_string(), metrics)
+                            .await;
                         tracing::info!("Successfully refreshed metrics for {}/{}", owner, repo);
                     }
                     Err((status, msg)) => {
-                        tracing::error!("Failed to refresh metrics for {}/{}: {} - {}", owner, repo, status, msg);
+                        tracing::error!(
+                            "Failed to refresh metrics for {}/{}: {} - {}",
+                            owner,
+                            repo,
+                            status,
+                            msg
+                        );
                     }
                 }
             } else {
