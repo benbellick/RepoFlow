@@ -47,6 +47,11 @@ struct RepoPath {
 async fn main() {
     // Load environment variables from .env file if it exists
     dotenvy::dotenv().ok();
+    // Also try to load .env.example to provide defaults if not set in .env
+    if dotenvy::from_filename(".env.example").is_err() {
+        // If we are in backend/ directory, try looking in root
+        dotenvy::from_filename("../.env.example").ok();
+    }
 
     init_tracing();
 
