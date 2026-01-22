@@ -9,6 +9,8 @@ const END_OF_DAY_SEC: u32 = 59;
 /// The root response structure for repository metrics.
 #[derive(Debug, Serialize, Clone)]
 pub struct RepoMetricsResponse {
+    /// The timestamp when the metrics were fetched.
+    pub fetched_at: DateTime<Utc>,
     /// The calculated summary statistics for the latest period.
     pub summary: SummaryMetrics,
     /// The day-by-day time series data.
@@ -79,6 +81,7 @@ pub fn calculate_metrics(
     let summary = calculate_summary(&time_series);
 
     RepoMetricsResponse {
+        fetched_at: now,
         summary,
         time_series,
     }
