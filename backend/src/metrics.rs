@@ -1,5 +1,5 @@
 use crate::github::GitHubPR;
-use chrono::{DateTime, Datelike, Duration, TimeZone, Utc};
+use chrono::{DateTime, Datelike, Duration, NaiveDate, TimeZone, Utc};
 use serde::Serialize;
 
 const END_OF_DAY_HOUR: u32 = 23;
@@ -60,90 +60,38 @@ pub fn calculate_metrics(
     let window_size_days = window_size.num_days();
 
     // Determine the date range we need to cover.
-    // We display metrics for [now - days_to_display, now].
-    // Each data point sums the previous `window_size` days.
-    // So we need daily buckets starting from `now - days_to_display - window_size`.
-
     let latest_date = now.date_naive();
     let oldest_display_date = latest_date - Duration::days(days_to_display_count);
-    let oldest_data_date = oldest_display_date - Duration::days(window_size_days);
+    let start_date = oldest_display_date - Duration::days(window_size_days);
 
-    // Total days to track in buckets.
-    // Example: latest = 10, oldest_data = 0. Range [0, 10]. Size 11.
-    let total_days = (latest_date - oldest_data_date).num_days() + 1;
-    let total_days_usize = total_days as usize;
+    // Initialize timelines for opened and merged events.
+    let mut opened_timeline = Timeline::new(start_date, latest_date);
+    let mut merged_timeline = Timeline::new(start_date, latest_date);
 
-    // Use a flat vector for O(1) access by day index.
-    let mut daily_opened = vec![0usize; total_days_usize];
-    let mut daily_merged = vec![0usize; total_days_usize];
-
-    // Single pass to bucket all PRs
+    // Populate timelines in a single pass.
     for pr in prs {
-        let created_date = pr.created_at.date_naive();
-        if created_date >= oldest_data_date && created_date <= latest_date {
-            let idx = (created_date - oldest_data_date).num_days() as usize;
-            if idx < total_days_usize {
-                daily_opened[idx] += 1;
-            }
-        }
-
+        opened_timeline.increment(pr.created_at.date_naive());
         if let Some(merged_at) = pr.merged_at {
-            let merged_date = merged_at.date_naive();
-            if merged_date >= oldest_data_date && merged_date <= latest_date {
-                let idx = (merged_date - oldest_data_date).num_days() as usize;
-                if idx < total_days_usize {
-                    daily_merged[idx] += 1;
-                }
-            }
+            merged_timeline.increment(merged_at.date_naive());
         }
     }
 
-    // Compute prefix sums for O(1) range queries
-    // prefix[i] = sum(bucket[0]...bucket[i])
-    let mut prefix_opened = vec![0usize; total_days_usize];
-    let mut prefix_merged = vec![0usize; total_days_usize];
+    // Convert to prefix sums for O(1) range queries.
+    let opened_prefix = opened_timeline.into_prefix_sums();
+    let merged_prefix = merged_timeline.into_prefix_sums();
 
-    if total_days_usize > 0 {
-        prefix_opened[0] = daily_opened[0];
-        prefix_merged[0] = daily_merged[0];
-
-        for i in 1..total_days_usize {
-            prefix_opened[i] = prefix_opened[i - 1] + daily_opened[i];
-            prefix_merged[i] = prefix_merged[i - 1] + daily_merged[i];
-        }
-    }
-
+    // Generate the result time series.
     let time_series: Vec<FlowMetricsResponse> = (0..=days_to_display_count)
         .rev()
         .map(|i| {
             let date = now - Duration::days(i);
             let date_naive = date.date_naive();
 
-            // Map the target date to our bucket index
-            let end_idx = (date_naive - oldest_data_date).num_days() as usize;
+            // Calculate rolling window sums using the prefix timelines.
+            let opened = opened_prefix.sum_in_window(date_naive, window_size_days);
+            let merged = merged_prefix.sum_in_window(date_naive, window_size_days);
 
-            // We want the sum of the last `window_size_days` buckets ending at `end_idx`.
-            // Range: (end_idx - window_size, end_idx] (indices).
-            // Sum = prefix[end_idx] - prefix[end_idx - window_size].
-            // If window_size is 30, we sum 30 buckets: end_idx, end_idx-1, ..., end_idx-29.
-            // This requires end_idx >= 29 (if 0-based).
-            // Our buffer starts `window_size` days before the first display date.
-            // So end_idx should always be >= window_size_days.
-
-            let opened = if end_idx >= window_size_days as usize {
-                prefix_opened[end_idx] - prefix_opened[end_idx - window_size_days as usize]
-            } else {
-                // Fallback for safety, though theoretically unreachable with valid dates
-                prefix_opened[end_idx]
-            };
-
-            let merged = if end_idx >= window_size_days as usize {
-                prefix_merged[end_idx] - prefix_merged[end_idx - window_size_days as usize]
-            } else {
-                prefix_merged[end_idx]
-            };
-
-            // We set the time to the end of the day to match the original behavior
+            // We set the time to the end of the day to ensure we capture all activity for that date.
             let target_date = Utc
                 .with_ymd_and_hms(
                     date.year(),
@@ -169,6 +117,89 @@ pub fn calculate_metrics(
     RepoMetricsResponse {
         summary,
         time_series,
+    }
+}
+
+/// Helper struct to manage daily event counts over a date range.
+struct Timeline {
+    start_date: NaiveDate,
+    end_date: NaiveDate,
+    counts: Vec<usize>,
+}
+
+impl Timeline {
+    fn new(start_date: NaiveDate, end_date: NaiveDate) -> Self {
+        let days = (end_date - start_date).num_days();
+        let size = if days >= 0 { (days + 1) as usize } else { 0 };
+        Self {
+            start_date,
+            end_date,
+            counts: vec![0; size],
+        }
+    }
+
+    fn increment(&mut self, date: NaiveDate) {
+        if date >= self.start_date && date <= self.end_date {
+            let idx = (date - self.start_date).num_days() as usize;
+            if idx < self.counts.len() {
+                self.counts[idx] += 1;
+            }
+        }
+    }
+
+    fn into_prefix_sums(self) -> PrefixTimeline {
+        let mut prefix_counts = Vec::with_capacity(self.counts.len());
+        let mut sum = 0;
+        for count in self.counts {
+            sum += count;
+            prefix_counts.push(sum);
+        }
+        PrefixTimeline {
+            start_date: self.start_date,
+            prefix_counts,
+        }
+    }
+}
+
+/// Helper struct to perform O(1) range sum queries using prefix sums.
+struct PrefixTimeline {
+    start_date: NaiveDate,
+    prefix_counts: Vec<usize>,
+}
+
+impl PrefixTimeline {
+    /// Returns the sum of events in the window (end_date - window_size, end_date].
+    fn sum_in_window(&self, end_date: NaiveDate, window_size_days: i64) -> usize {
+        let end_idx_signed = (end_date - self.start_date).num_days();
+
+        // If the query date is before our start date, we have no data.
+        if end_idx_signed < 0 {
+            return 0;
+        }
+
+        let end_idx = end_idx_signed as usize;
+        // Ensure we don't go out of bounds (though valid logic shouldn't).
+        let end_val = if end_idx < self.prefix_counts.len() {
+            self.prefix_counts[end_idx]
+        } else {
+            *self.prefix_counts.last().unwrap_or(&0)
+        };
+
+        // window start index = end_idx - window_size
+        let start_idx_signed = end_idx_signed - window_size_days;
+
+        let start_val = if start_idx_signed < 0 {
+            0
+        } else {
+            let idx = start_idx_signed as usize;
+             if idx < self.prefix_counts.len() {
+                self.prefix_counts[idx]
+            } else {
+                *self.prefix_counts.last().unwrap_or(&0)
+            }
+        };
+
+        end_val.saturating_sub(start_val)
     }
 }
 
@@ -202,7 +233,6 @@ mod tests {
     use super::*;
     use crate::github::PRState;
     use chrono::TimeZone;
-
 
     #[test]
     fn test_calculate_metrics_empty() {
