@@ -11,10 +11,11 @@ use futures::stream::{self, StreamExt};
 use github::GitHubClient;
 use moka::future::Cache;
 use serde::{Deserialize, Serialize};
+use moka::notification::RemovalCause;
 use std::net::SocketAddr;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration as StdDuration;
-use std::collections::HashSet;
+use tokio::sync::mpsc;
 use tower_http::services::{ServeDir, ServeFile};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -30,8 +31,6 @@ const METRICS_WINDOW_SIZE: i64 = 30;
 /// Time to live for cached repository metrics (24 hours).
 /// Note: This long TTL reduces GitHub API load but may result in stale data.
 const CACHE_TTL: StdDuration = StdDuration::from_secs(86400);
-/// Threshold after which a cached item is considered stale and triggers a background refresh (1 hour).
-const REFRESH_THRESHOLD: StdDuration = StdDuration::from_secs(3600);
 /// Maximum number of entries to keep in the metrics cache.
 const CACHE_MAX_CAPACITY: u64 = 1000;
 /// Maximum number of concurrent requests for preloading popular repositories.
@@ -66,8 +65,6 @@ struct AppState {
     github_client: GitHubClient,
     /// In-memory cache for repository metrics to avoid redundant API calls and processing.
     metrics_cache: Cache<String, metrics::RepoMetricsResponse>,
-    /// Set of repository cache keys currently being refreshed in the background.
-    refreshing_repos: Arc<Mutex<HashSet<String>>>,
 }
 
 /// Parameters extracted from the URL path /api/repos/:owner/:repo/metrics
@@ -90,15 +87,46 @@ async fn main() {
         }
     };
 
+    let (tx, mut rx) = mpsc::unbounded_channel::<Arc<String>>();
+
     let metrics_cache = Cache::builder()
         .max_capacity(CACHE_MAX_CAPACITY)
         .time_to_live(CACHE_TTL)
+        .eviction_listener(move |key: Arc<String>, _value, cause| {
+            if cause == RemovalCause::Expired {
+                tracing::info!("Cache entry expired for key: {}", key);
+                if let Err(e) = tx.send(key) {
+                    tracing::error!("Failed to send expired key to refresh channel: {}", e);
+                }
+            }
+        })
         .build();
 
     let state = Arc::new(AppState {
-        github_client,
-        metrics_cache,
-        refreshing_repos: Arc::new(Mutex::new(HashSet::new())),
+        github_client: github_client.clone(),
+        metrics_cache: metrics_cache.clone(),
+    });
+
+    // Background task to refresh expired cache entries
+    let refresh_state = state.clone();
+    tokio::spawn(async move {
+        while let Some(key) = rx.recv().await {
+            // Key format is "owner::{}/repo::{}"
+            if let Some((owner, repo)) = parse_cache_key(&key) {
+                tracing::info!("Refreshing expired metrics for {}/{}", owner, repo);
+                match fetch_and_calculate_metrics(&refresh_state, &owner, &repo).await {
+                    Ok(metrics) => {
+                        refresh_state.metrics_cache.insert(key.to_string(), metrics).await;
+                        tracing::info!("Successfully refreshed metrics for {}/{}", owner, repo);
+                    }
+                    Err((status, msg)) => {
+                        tracing::error!("Failed to refresh metrics for {}/{}: {} - {}", owner, repo, status, msg);
+                    }
+                }
+            } else {
+                tracing::warn!("Failed to parse cache key: {}", key);
+            }
+        }
     });
 
     let state_clone = state.clone();
@@ -178,46 +206,7 @@ async fn get_repo_metrics(
     let cache_key = get_cache_key(&owner, &repo);
 
     if let Some(cached_metrics) = state.metrics_cache.get(&cache_key).await {
-        let age = Utc::now().signed_duration_since(cached_metrics.fetched_at);
-        let refresh_threshold = Duration::from_std(REFRESH_THRESHOLD).unwrap();
-
-        if age > refresh_threshold {
-            let mut refreshing = state.refreshing_repos.lock().unwrap();
-            if !refreshing.contains(&cache_key) {
-                tracing::info!(owner = %owner, repo = %repo, "Cache is stale (age: {}s), triggering background refresh", age.num_seconds());
-                refreshing.insert(cache_key.clone());
-                drop(refreshing); // Release lock before spawning
-
-                let state_clone = state.clone();
-                let owner_clone = owner.clone();
-                let repo_clone = repo.clone();
-                let cache_key_clone = cache_key.clone();
-
-                tokio::spawn(async move {
-                    match fetch_and_calculate_metrics(&state_clone, &owner_clone, &repo_clone).await
-                    {
-                        Ok(metrics) => {
-                            state_clone
-                                .metrics_cache
-                                .insert(cache_key_clone.clone(), metrics)
-                                .await;
-                            tracing::info!(owner = %owner_clone, repo = %repo_clone, "Background refresh successful");
-                        }
-                        Err((status, msg)) => {
-                            tracing::error!(owner = %owner_clone, repo = %repo_clone, status = ?status, msg = %msg, "Background refresh failed");
-                        }
-                    }
-
-                    // Remove from refreshing set
-                    let mut refreshing = state_clone.refreshing_repos.lock().unwrap();
-                    refreshing.remove(&cache_key_clone);
-                });
-            } else {
-                tracing::debug!(owner = %owner, repo = %repo, "Cache is stale but refresh already in progress");
-            }
-        } else {
-            tracing::debug!(owner = %owner, repo = %repo, "Returning cached metrics");
-        }
+        tracing::debug!(owner = %owner, repo = %repo, "Returning cached metrics");
         return Ok(Json(cached_metrics));
     }
 
@@ -305,6 +294,25 @@ async fn preload_single_repo(state: &AppState, owner: &str, repo: &str) {
 
 fn get_cache_key(owner: &str, repo: &str) -> String {
     format!("owner::{}/repo::{}", owner, repo)
+}
+
+fn parse_cache_key(key: &str) -> Option<(String, String)> {
+    let parts: Vec<&str> = key.split('/').collect();
+    if parts.len() != 2 {
+        return None;
+    }
+
+    let owner_part = parts[0];
+    let repo_part = parts[1];
+
+    if !owner_part.starts_with("owner::") || !repo_part.starts_with("repo::") {
+        return None;
+    }
+
+    let owner = owner_part.trim_start_matches("owner::").to_string();
+    let repo = repo_part.trim_start_matches("repo::").to_string();
+
+    Some((owner, repo))
 }
 
 async fn shutdown_signal() {
