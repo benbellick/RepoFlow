@@ -5,14 +5,17 @@ import type { RepoMetricsResponse, PopularRepo } from '../types'
  *
  * @param owner - The GitHub username or organization.
  * @param repo - The repository name.
+ * @param signal - An optional AbortSignal to cancel the request.
  * @returns A promise that resolves to a RepoMetricsResponse object.
  */
 export const fetchRepoMetrics = async (
   owner: string,
   repo: string,
+  signal?: AbortSignal,
 ): Promise<RepoMetricsResponse> => {
   const response = await fetch(
     `/api/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/metrics`,
+    { signal },
   )
 
   if (!response.ok) {

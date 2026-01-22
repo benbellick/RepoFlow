@@ -17,6 +17,9 @@ describe('App', () => {
       },
     })
 
+    // Mock fetchPopularRepos to return empty array to avoid network errors
+    vi.spyOn(api, 'fetchPopularRepos').mockResolvedValue([])
+
     render(<App />)
 
     const input = screen.getByPlaceholderText('https://github.com/owner/repo')
@@ -28,7 +31,7 @@ describe('App', () => {
     fireEvent.click(button)
 
     await waitFor(() => {
-      expect(fetchSpy).toHaveBeenCalledWith('empty', 'repo')
+      expect(fetchSpy).toHaveBeenCalledWith('empty', 'repo', expect.any(AbortSignal))
     })
 
     const noDataMessage = await screen.findByText(/No data found/i)
