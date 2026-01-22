@@ -56,11 +56,94 @@ pub fn calculate_metrics(
     window_size: Duration,
     now: DateTime<Utc>,
 ) -> RepoMetricsResponse {
-    let time_series: Vec<FlowMetricsResponse> = (0..=days_to_display.num_days())
+    let days_to_display_count = days_to_display.num_days();
+    let window_size_days = window_size.num_days();
+
+    // Determine the date range we need to cover.
+    // We display metrics for [now - days_to_display, now].
+    // Each data point sums the previous `window_size` days.
+    // So we need daily buckets starting from `now - days_to_display - window_size`.
+
+    let latest_date = now.date_naive();
+    let oldest_display_date = latest_date - Duration::days(days_to_display_count);
+    let oldest_data_date = oldest_display_date - Duration::days(window_size_days);
+
+    // Total days to track in buckets.
+    // Example: latest = 10, oldest_data = 0. Range [0, 10]. Size 11.
+    let total_days = (latest_date - oldest_data_date).num_days() + 1;
+    let total_days_usize = total_days as usize;
+
+    // Use a flat vector for O(1) access by day index.
+    let mut daily_opened = vec![0usize; total_days_usize];
+    let mut daily_merged = vec![0usize; total_days_usize];
+
+    // Single pass to bucket all PRs
+    for pr in prs {
+        let created_date = pr.created_at.date_naive();
+        if created_date >= oldest_data_date && created_date <= latest_date {
+            let idx = (created_date - oldest_data_date).num_days() as usize;
+            if idx < total_days_usize {
+                daily_opened[idx] += 1;
+            }
+        }
+
+        if let Some(merged_at) = pr.merged_at {
+            let merged_date = merged_at.date_naive();
+            if merged_date >= oldest_data_date && merged_date <= latest_date {
+                let idx = (merged_date - oldest_data_date).num_days() as usize;
+                if idx < total_days_usize {
+                    daily_merged[idx] += 1;
+                }
+            }
+        }
+    }
+
+    // Compute prefix sums for O(1) range queries
+    // prefix[i] = sum(bucket[0]...bucket[i])
+    let mut prefix_opened = vec![0usize; total_days_usize];
+    let mut prefix_merged = vec![0usize; total_days_usize];
+
+    if total_days_usize > 0 {
+        prefix_opened[0] = daily_opened[0];
+        prefix_merged[0] = daily_merged[0];
+
+        for i in 1..total_days_usize {
+            prefix_opened[i] = prefix_opened[i - 1] + daily_opened[i];
+            prefix_merged[i] = prefix_merged[i - 1] + daily_merged[i];
+        }
+    }
+
+    let time_series: Vec<FlowMetricsResponse> = (0..=days_to_display_count)
         .rev()
         .map(|i| {
             let date = now - Duration::days(i);
-            // We set the time to the end of the day to ensure we capture all activity for that date.
+            let date_naive = date.date_naive();
+
+            // Map the target date to our bucket index
+            let end_idx = (date_naive - oldest_data_date).num_days() as usize;
+
+            // We want the sum of the last `window_size_days` buckets ending at `end_idx`.
+            // Range: (end_idx - window_size, end_idx] (indices).
+            // Sum = prefix[end_idx] - prefix[end_idx - window_size].
+            // If window_size is 30, we sum 30 buckets: end_idx, end_idx-1, ..., end_idx-29.
+            // This requires end_idx >= 29 (if 0-based).
+            // Our buffer starts `window_size` days before the first display date.
+            // So end_idx should always be >= window_size_days.
+
+            let opened = if end_idx >= window_size_days as usize {
+                prefix_opened[end_idx] - prefix_opened[end_idx - window_size_days as usize]
+            } else {
+                // Fallback for safety, though theoretically unreachable with valid dates
+                prefix_opened[end_idx]
+            };
+
+            let merged = if end_idx >= window_size_days as usize {
+                prefix_merged[end_idx] - prefix_merged[end_idx - window_size_days as usize]
+            } else {
+                prefix_merged[end_idx]
+            };
+
+            // We set the time to the end of the day to match the original behavior
             let target_date = Utc
                 .with_ymd_and_hms(
                     date.year(),
@@ -72,7 +155,12 @@ pub fn calculate_metrics(
                 )
                 .unwrap();
 
-            calculate_day_metrics(prs, target_date, window_size)
+            FlowMetricsResponse {
+                date: target_date.format("%Y-%m-%d").to_string(),
+                opened,
+                merged,
+                spread: opened as i64 - merged as i64,
+            }
         })
         .collect();
 
@@ -109,40 +197,12 @@ fn calculate_summary(time_series: &[FlowMetricsResponse]) -> SummaryMetrics {
     }
 }
 
-/// Calculates opened and merged metrics for a single point in time using a rolling window.
-fn calculate_day_metrics(
-    prs: &[GitHubPR],
-    target_date: DateTime<Utc>,
-    window_size: Duration,
-) -> FlowMetricsResponse {
-    let window_start = target_date - window_size;
-
-    let opened = prs
-        .iter()
-        .filter(|pr| pr.created_at >= window_start && pr.created_at <= target_date)
-        .count();
-
-    let merged = prs
-        .iter()
-        .filter(|pr| {
-            pr.merged_at
-                .is_some_and(|merged_at| merged_at >= window_start && merged_at <= target_date)
-        })
-        .count();
-
-    FlowMetricsResponse {
-        date: target_date.format("%Y-%m-%d").to_string(),
-        opened,
-        merged,
-        spread: opened as i64 - merged as i64,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::github::PRState;
     use chrono::TimeZone;
+
 
     #[test]
     fn test_calculate_metrics_empty() {
@@ -194,4 +254,5 @@ mod tests {
         assert_eq!(metrics.merge_rate, 0);
         assert_eq!(metrics.is_widening, false);
     }
+
 }
