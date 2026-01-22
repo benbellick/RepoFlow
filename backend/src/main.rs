@@ -1,3 +1,4 @@
+mod cache;
 mod github;
 mod metrics;
 
@@ -6,33 +7,16 @@ use axum::{
     routing::get,
     Json, Router,
 };
-use chrono::{Duration, Utc};
+use cache::MetricsCache;
 use futures::stream::{self, StreamExt};
 use github::GitHubClient;
-use moka::future::Cache;
-use moka::notification::RemovalCause;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::time::Duration as StdDuration;
-use tokio::sync::mpsc;
 use tower_http::services::{ServeDir, ServeFile};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-/// Number of past days to fetch pull request data for from the GitHub API.
-const PR_FETCH_DAYS: i64 = 90;
-/// Hard limit on the number of paginated requests to make to the GitHub API per repository.
-const MAX_GITHUB_API_PAGES: u32 = 10;
-/// The number of individual data points (days) to return in the flow metrics response.
-const METRICS_DAYS_TO_DISPLAY: i64 = 30;
-/// The size of the trailing window (in days) used to calculate the rolling counts.
-const METRICS_WINDOW_SIZE: i64 = 30;
-/// Time to live for cached repository metrics (24 hours).
-/// Note: This long TTL reduces GitHub API load but may result in stale data.
-const CACHE_TTL: StdDuration = StdDuration::from_secs(86400);
-/// Maximum number of entries to keep in the metrics cache.
-const CACHE_MAX_CAPACITY: u64 = 1000;
 /// Maximum number of concurrent requests for preloading popular repositories.
 const MAX_CONCURRENT_PRELOADS: usize = 4;
 
@@ -63,8 +47,8 @@ struct PopularRepo {
 struct AppState {
     /// Thread-safe client for interacting with the GitHub API.
     github_client: GitHubClient,
-    /// In-memory cache for repository metrics to avoid redundant API calls and processing.
-    metrics_cache: Cache<String, metrics::RepoMetricsResponse>,
+    /// Encapsulated cache for repository metrics with automatic background refresh.
+    metrics_cache: MetricsCache,
 }
 
 /// Parameters extracted from the URL path /api/repos/:owner/:repo/metrics
@@ -87,55 +71,11 @@ async fn main() {
         }
     };
 
-    let (tx, mut rx) = mpsc::unbounded_channel::<Arc<String>>();
-
-    let metrics_cache = Cache::builder()
-        .max_capacity(CACHE_MAX_CAPACITY)
-        .time_to_live(CACHE_TTL)
-        .eviction_listener(move |key: Arc<String>, _value, cause| {
-            if cause == RemovalCause::Expired {
-                tracing::info!("Cache entry expired for key: {}", key);
-                if let Err(e) = tx.send(key) {
-                    tracing::error!("Failed to send expired key to refresh channel: {}", e);
-                }
-            }
-        })
-        .build();
+    let metrics_cache = MetricsCache::new(github_client.clone());
 
     let state = Arc::new(AppState {
-        github_client: github_client.clone(),
-        metrics_cache: metrics_cache.clone(),
-    });
-
-    // Background task to refresh expired cache entries
-    let refresh_state = state.clone();
-    tokio::spawn(async move {
-        while let Some(key) = rx.recv().await {
-            // Key format is "owner::{}/repo::{}"
-            if let Some((owner, repo)) = parse_cache_key(&key) {
-                tracing::info!("Refreshing expired metrics for {}/{}", owner, repo);
-                match fetch_and_calculate_metrics(&refresh_state, &owner, &repo).await {
-                    Ok(metrics) => {
-                        refresh_state
-                            .metrics_cache
-                            .insert(key.to_string(), metrics)
-                            .await;
-                        tracing::info!("Successfully refreshed metrics for {}/{}", owner, repo);
-                    }
-                    Err((status, msg)) => {
-                        tracing::error!(
-                            "Failed to refresh metrics for {}/{}: {} - {}",
-                            owner,
-                            repo,
-                            status,
-                            msg
-                        );
-                    }
-                }
-            } else {
-                tracing::warn!("Failed to parse cache key: {}", key);
-            }
-        }
+        github_client,
+        metrics_cache,
     });
 
     let state_clone = state.clone();
@@ -212,65 +152,12 @@ async fn get_repo_metrics(
     Path(RepoPath { owner, repo }): Path<RepoPath>,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<metrics::RepoMetricsResponse>, (axum::http::StatusCode, String)> {
-    let cache_key = get_cache_key(&owner, &repo);
-
-    if let Some(cached_metrics) = state.metrics_cache.get(&cache_key).await {
-        tracing::debug!(owner = %owner, repo = %repo, "Returning cached metrics");
-        return Ok(Json(cached_metrics));
-    }
-
-    let metrics = fetch_and_calculate_metrics(&state, &owner, &repo).await?;
-
-    state.metrics_cache.insert(cache_key, metrics.clone()).await;
+    let metrics = state
+        .metrics_cache
+        .get(&state.github_client, &owner, &repo)
+        .await?;
 
     Ok(Json(metrics))
-}
-
-async fn fetch_and_calculate_metrics(
-    state: &AppState,
-    owner: &str,
-    repo: &str,
-) -> Result<metrics::RepoMetricsResponse, (axum::http::StatusCode, String)> {
-    let prs = state
-        .github_client
-        .fetch_pull_requests(owner, repo, PR_FETCH_DAYS, MAX_GITHUB_API_PAGES)
-        .await
-        .map_err(|e| {
-            tracing::error!("Failed to fetch PRs for {}/{}: {}", owner, repo, e);
-
-            if let Some(octocrab::Error::GitHub { source, .. }) =
-                e.downcast_ref::<octocrab::Error>()
-            {
-                // TODO(#29): Refactor this brittle string matching.
-                // We should inspect the raw HTTP status code or use a strongly-typed error variant if available.
-                if source.message.to_lowercase().contains("rate limit") {
-                    return (
-                        axum::http::StatusCode::TOO_MANY_REQUESTS,
-                        "GitHub Rate Limit Exceeded".to_string(),
-                    );
-                }
-                if source.message.to_lowercase().contains("not found") {
-                    return (
-                        axum::http::StatusCode::NOT_FOUND,
-                        "Repository Not Found".to_string(),
-                    );
-                }
-            }
-
-            (
-                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-                "Internal Server Error".to_string(),
-            )
-        })?;
-
-    let metrics = metrics::calculate_metrics(
-        &prs,
-        Duration::days(METRICS_DAYS_TO_DISPLAY),
-        Duration::days(METRICS_WINDOW_SIZE),
-        Utc::now(),
-    );
-
-    Ok(metrics)
 }
 
 async fn preload_popular_repos(state: Arc<AppState>) {
@@ -289,39 +176,18 @@ async fn preload_popular_repos(state: Arc<AppState>) {
 }
 
 async fn preload_single_repo(state: &AppState, owner: &str, repo: &str) {
-    let cache_key = get_cache_key(owner, repo);
-    match fetch_and_calculate_metrics(state, owner, repo).await {
-        Ok(metrics) => {
-            state.metrics_cache.insert(cache_key, metrics).await;
+    match state
+        .metrics_cache
+        .get(&state.github_client, owner, repo)
+        .await
+    {
+        Ok(_) => {
             tracing::info!(owner = %owner, repo = %repo, "Preloaded metrics");
         }
         Err((status, msg)) => {
             tracing::warn!(owner = %owner, repo = %repo, status = ?status, msg = %msg, "Failed to preload metrics");
         }
     }
-}
-
-fn get_cache_key(owner: &str, repo: &str) -> String {
-    format!("owner::{}/repo::{}", owner, repo)
-}
-
-fn parse_cache_key(key: &str) -> Option<(String, String)> {
-    let parts: Vec<&str> = key.split('/').collect();
-    if parts.len() != 2 {
-        return None;
-    }
-
-    let owner_part = parts[0];
-    let repo_part = parts[1];
-
-    if !owner_part.starts_with("owner::") || !repo_part.starts_with("repo::") {
-        return None;
-    }
-
-    let owner = owner_part.trim_start_matches("owner::").to_string();
-    let repo = repo_part.trim_start_matches("repo::").to_string();
-
-    Some((owner, repo))
 }
 
 async fn shutdown_signal() {
