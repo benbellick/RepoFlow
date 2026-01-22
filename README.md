@@ -32,15 +32,24 @@ When contributing to open source, it's often hard to tell if a project is health
     ```
 
 2.  **Install dependencies:**
-    ```bash
     npm install
     ```
 
 3.  **Set up Environment Variables:**
-    Create a `.env` file in the root directory to increase GitHub API rate limits:
-    ```env
-    VITE_GITHUB_TOKEN=your_personal_access_token_here
+
+    The backend requires several environment variables to function. You can create a `.env` file in the root directory by copying the example:
+
+    ```bash
+    cp .env.example .env
     ```
+
+    Edit `.env` to add your optional `GITHUB_TOKEN` (for higher rate limits) or adjust other configuration.
+
+    **Required Variables (see `.env.example` for defaults):**
+    - `PR_FETCH_DAYS`: History window for fetching PRs.
+    - `POPULAR_REPOS`: List of repos to preload (comma-separated).
+    - `CACHE_TTL_SECONDS`: Cache duration.
+    - `GITHUB_TOKEN` (Optional): Personal Access Token.
 
 4.  **Run the development server:**
     ```bash

@@ -16,3 +16,8 @@ anyhow = "1.0.100"
 octocrab = "0.40.0"
 moka = { version = "0.12.12", features = ["future"] }
 futures = "0.3.31"
+envy = "0.4"
+dotenvy = "0.15"
+
+[dev-dependencies]
+serial_test = "3.2.0"

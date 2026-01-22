@@ -5,6 +5,8 @@ services:
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
+    env_file:
+      - .env
     environment:
       - RUST_LOG=backend=debug,tower_http=debug
     restart: unless-stopped

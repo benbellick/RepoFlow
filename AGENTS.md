@@ -5,3 +5,4 @@
   - Rust: `cargo check`, `cargo clippy -- -D warnings`, `cargo test`. ALWAYS run `cargo fmt` to ensure code is formatted correctly.
   - Frontend: `npm run lint`, `npm run build`, `npm test`. ALWAYS run `npm run format` to ensure code is formatted correctly.
 - **Minimal Comments.** Only add comments if they explain *why* a complex piece of logic exists. Do not add comments describing *what* the code is doing (e.g., avoid `// Start server` or `// Define routes`).
+- **Configuration.** The backend uses the 12-factor app methodology. Configuration is loaded from environment variables using `AppConfig`. Do not hardcode constants for configuration.
