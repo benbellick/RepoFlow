@@ -17,10 +17,7 @@ describe('fetchRepoMetrics', () => {
 
     await fetchRepoMetrics('owner', 'repo')
 
-    expect(fetchSpy).toHaveBeenCalledWith(
-      '/api/repos/owner/repo/metrics',
-      { signal: undefined }
-    )
+    expect(fetchSpy).toHaveBeenCalledWith('/api/repos/owner/repo/metrics', { signal: undefined })
   })
 
   it('passes abort signal to fetch', async () => {
@@ -35,8 +32,8 @@ describe('fetchRepoMetrics', () => {
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining('/api/repos/owner/repo/metrics'),
       expect.objectContaining({
-        signal: controller.signal
-      })
+        signal: controller.signal,
+      }),
     )
   })
 })
