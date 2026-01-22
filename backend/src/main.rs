@@ -1,4 +1,5 @@
 mod cache;
+mod config;
 mod github;
 mod metrics;
 
@@ -8,6 +9,7 @@ use axum::{
     Json, Router,
 };
 use cache::MetricsCache;
+use config::{AppConfig, PopularRepo};
 use futures::stream::{self, StreamExt};
 use github::GitHubClient;
 use serde::{Deserialize, Serialize};
@@ -17,30 +19,11 @@ use tower_http::services::{ServeDir, ServeFile};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-/// Maximum number of concurrent requests for preloading popular repositories.
-const MAX_CONCURRENT_PRELOADS: usize = 4;
-
-/// List of popular repositories to preload and display in the UI.
-const POPULAR_REPOS: &[(&str, &str)] = &[
-    ("facebook", "react"),
-    ("rust-lang", "rust"),
-    ("vercel", "next.js"),
-    ("tailwindlabs", "tailwindcss"),
-    ("microsoft", "vscode"),
-    ("rust-lang", "rust-analyzer"),
-];
-
 #[derive(Serialize)]
 struct HealthResponse {
     status: &'static str,
     service: &'static str,
     version: &'static str,
-}
-
-#[derive(Serialize, Clone)]
-struct PopularRepo {
-    owner: String,
-    repo: String,
 }
 
 /// Shared application state accessible to all request handlers.
@@ -49,6 +32,8 @@ struct AppState {
     github_client: GitHubClient,
     /// Encapsulated cache for repository metrics with automatic background refresh.
     metrics_cache: MetricsCache,
+    /// Application configuration loaded from environment variables.
+    config: AppConfig,
 }
 
 /// Parameters extracted from the URL path /api/repos/:owner/:repo/metrics
@@ -60,10 +45,24 @@ struct RepoPath {
 
 #[tokio::main]
 async fn main() {
+    // Load environment variables from .env file if it exists
+    dotenvy::dotenv().ok();
+
     init_tracing();
 
-    let github_token = std::env::var("GITHUB_TOKEN").ok();
-    let github_client = match GitHubClient::new(github_token) {
+    let config = match AppConfig::from_env() {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::error!("Failed to load configuration: {}. Exiting.", e);
+            std::process::exit(1);
+        }
+    };
+
+    if config.github_token.is_none() {
+        tracing::warn!("Running without GITHUB_TOKEN. Rate limits will be strict.");
+    }
+
+    let github_client = match GitHubClient::new(config.github_token.clone()) {
         Ok(client) => client,
         Err(e) => {
             tracing::error!("Failed to initialize GitHub client: {}. Exiting.", e);
@@ -71,11 +70,12 @@ async fn main() {
         }
     };
 
-    let metrics_cache = MetricsCache::new(github_client.clone());
+    let metrics_cache = MetricsCache::new(github_client.clone(), &config);
 
     let state = Arc::new(AppState {
         github_client,
         metrics_cache,
+        config,
     });
 
     let state_clone = state.clone();
@@ -137,15 +137,8 @@ async fn health_check() -> Json<HealthResponse> {
     })
 }
 
-async fn get_popular_repos() -> Json<Vec<PopularRepo>> {
-    let repos = POPULAR_REPOS
-        .iter()
-        .map(|(owner, repo)| PopularRepo {
-            owner: owner.to_string(),
-            repo: repo.to_string(),
-        })
-        .collect();
-    Json(repos)
+async fn get_popular_repos(State(state): State<Arc<AppState>>) -> Json<Vec<PopularRepo>> {
+    Json(state.config.popular_repos.clone())
 }
 
 async fn get_repo_metrics(
@@ -161,13 +154,16 @@ async fn get_repo_metrics(
 }
 
 async fn preload_popular_repos(state: Arc<AppState>) {
-    tracing::info!("Preloading {} popular repositories", POPULAR_REPOS.len());
+    tracing::info!(
+        "Preloading {} popular repositories",
+        state.config.popular_repos.len()
+    );
 
-    stream::iter(POPULAR_REPOS)
-        .for_each_concurrent(MAX_CONCURRENT_PRELOADS, |&(owner, repo)| {
+    stream::iter(&state.config.popular_repos)
+        .for_each_concurrent(state.config.max_concurrent_preloads, |repo| {
             let state = state.clone();
             async move {
-                preload_single_repo(&state, owner, repo).await;
+                preload_single_repo(&state, &repo.owner, &repo.repo).await;
             }
         })
         .await;

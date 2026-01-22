@@ -1,27 +1,8 @@
-use crate::{github::GitHubClient, metrics};
+use crate::{config::AppConfig, github::GitHubClient, metrics};
 use chrono::{Duration, Utc};
 use moka::{future::Cache, notification::RemovalCause};
 use std::sync::Arc;
-use std::time::Duration as StdDuration;
 use tokio::sync::mpsc;
-
-/// Time to live for cached repository metrics (24 hours).
-const CACHE_TTL: StdDuration = StdDuration::from_secs(86400);
-
-/// Maximum number of entries to keep in the metrics cache.
-const CACHE_MAX_CAPACITY: u64 = 1000;
-
-/// Number of past days to fetch pull request data for from the GitHub API.
-const PR_FETCH_DAYS: i64 = 90;
-
-/// Hard limit on the number of paginated requests to make to the GitHub API per repository.
-const MAX_GITHUB_API_PAGES: u32 = 10;
-
-/// The number of individual data points (days) to return in the flow metrics response.
-const METRICS_DAYS_TO_DISPLAY: i64 = 30;
-
-/// The size of the trailing window (in days) used to calculate the rolling counts.
-const METRICS_WINDOW_SIZE: i64 = 30;
 
 /// A structured key for the metrics cache.
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
@@ -34,6 +15,7 @@ pub struct CacheKey {
 #[derive(Clone)]
 pub struct MetricsCache {
     inner: Cache<CacheKey, metrics::RepoMetricsResponse>,
+    config: AppConfig,
 }
 
 impl MetricsCache {
@@ -41,12 +23,13 @@ impl MetricsCache {
     ///
     /// # Arguments
     /// * `github_client` - The client used to fetch data from GitHub during refresh.
-    pub fn new(github_client: GitHubClient) -> Self {
+    /// * `config` - The application configuration.
+    pub fn new(github_client: GitHubClient, config: &AppConfig) -> Self {
         let (tx, mut rx) = mpsc::unbounded_channel::<Arc<CacheKey>>();
 
         let cache = Cache::builder()
-            .max_capacity(CACHE_MAX_CAPACITY)
-            .time_to_live(CACHE_TTL)
+            .max_capacity(config.cache_max_capacity)
+            .time_to_live(config.cache_ttl())
             .eviction_listener(move |key: Arc<CacheKey>, _value, cause| {
                 if cause == RemovalCause::Expired {
                     tracing::info!(
@@ -61,7 +44,10 @@ impl MetricsCache {
             })
             .build();
 
-        let metrics_cache = Self { inner: cache };
+        let metrics_cache = Self {
+            inner: cache,
+            config: config.clone(),
+        };
         let refresher = metrics_cache.clone();
 
         // Spawn background refresh task
@@ -134,7 +120,12 @@ impl MetricsCache {
         repo: &str,
     ) -> Result<metrics::RepoMetricsResponse, (axum::http::StatusCode, String)> {
         let prs = github_client
-            .fetch_pull_requests(owner, repo, PR_FETCH_DAYS, MAX_GITHUB_API_PAGES)
+            .fetch_pull_requests(
+                owner,
+                repo,
+                self.config.pr_fetch_days,
+                self.config.max_github_api_pages,
+            )
             .await
             .map_err(|e| {
                 tracing::error!("Failed to fetch PRs for {}/{}: {}", owner, repo, e);
@@ -164,8 +155,8 @@ impl MetricsCache {
 
         let metrics = metrics::calculate_metrics(
             &prs,
-            Duration::days(METRICS_DAYS_TO_DISPLAY),
-            Duration::days(METRICS_WINDOW_SIZE),
+            Duration::days(self.config.metrics_days_to_display),
+            Duration::days(self.config.metrics_window_size),
             Utc::now(),
         );
 
