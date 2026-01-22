@@ -2,25 +2,37 @@ use serde::Deserialize;
 use serde::Serialize;
 use std::time::Duration as StdDuration;
 
+/// Application configuration loaded from environment variables.
 #[derive(Clone, Debug, Deserialize)]
 pub struct AppConfig {
+    /// Number of past days to fetch pull request data for from the GitHub API.
     pub pr_fetch_days: i64,
 
+    /// Hard limit on the number of paginated requests to make to the GitHub API per repository.
     pub max_github_api_pages: u32,
 
+    /// The number of individual data points (days) to return in the flow metrics response.
     pub metrics_days_to_display: i64,
 
+    /// The size of the trailing window (in days) used to calculate the rolling counts.
     pub metrics_window_size: i64,
 
+    /// Time to live for cached repository metrics in seconds.
     pub cache_ttl_seconds: u64,
 
+    /// Maximum number of entries to keep in the metrics cache.
     pub cache_max_capacity: u64,
 
+    /// Maximum number of concurrent requests for preloading popular repositories.
     pub max_concurrent_preloads: usize,
 
+    /// List of popular repositories to preload.
+    /// Expected format: comma-separated string of "owner/repo" pairs.
+    /// Example: "facebook/react,rust-lang/rust"
     #[serde(deserialize_with = "deserialize_popular_repos")]
     pub popular_repos: Vec<PopularRepo>,
 
+    /// Optional GitHub Personal Access Token for higher rate limits.
     pub github_token: Option<String>,
 }
 
