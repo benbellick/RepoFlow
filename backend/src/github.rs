@@ -78,13 +78,11 @@ impl GitHubClient {
     pub async fn fetch_and_calculate_metrics(
         &self,
         config: &AppConfig,
-        owner: &str,
-        repo: &str,
+        repo_id: &RepoId,
     ) -> Result<RepoMetricsResponse> {
         let prs = self
             .fetch_pull_requests(
-                owner,
-                repo,
+                repo_id,
                 config.pr_fetch_days,
                 config.max_github_api_pages,
             )
@@ -106,14 +104,12 @@ impl GitHubClient {
     /// It stops fetching as soon as it encounters a PR older than the specified `days`.
     ///
     /// # Arguments
-    /// * `owner` - The GitHub username or organization (e.g., "facebook").
-    /// * `repo` - The repository name (e.g., "react").
+    /// * `repo_id` - The repository identifier (owner and name).
     /// * `days` - The number of days of history to fetch from the current time.
     /// * `max_pages` - The maximum number of API pages to traverse (safety limit).
     pub async fn fetch_pull_requests(
         &self,
-        owner: &str,
-        repo: &str,
+        repo_id: &RepoId,
         days: i64,
         max_pages: u32,
     ) -> Result<Vec<GitHubPR>> {
@@ -122,7 +118,7 @@ impl GitHubClient {
 
         let mut current_page = self
             .octocrab
-            .pulls(owner, repo)
+            .pulls(&repo_id.owner, &repo_id.repo)
             .list()
             .state(octocrab::params::State::All)
             .sort(octocrab::params::pulls::Sort::Created)

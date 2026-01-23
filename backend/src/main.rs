@@ -12,7 +12,7 @@ use cache::MetricsCache;
 use config::AppConfig;
 use futures::stream::{self, StreamExt};
 use github::GitHubClient;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tower_http::services::{ServeDir, ServeFile};
@@ -35,13 +35,6 @@ struct AppState {
     metrics_cache: MetricsCache,
     /// Application configuration loaded from environment variables.
     config: AppConfig,
-}
-
-/// Parameters extracted from the URL path /api/repos/:owner/:repo/metrics
-#[derive(Deserialize)]
-struct RepoPath {
-    owner: String,
-    repo: String,
 }
 
 #[tokio::main]
@@ -143,17 +136,15 @@ async fn get_popular_repos(State(state): State<Arc<AppState>>) -> Json<Vec<RepoI
 }
 
 async fn get_repo_metrics(
-    Path(RepoPath { owner, repo }): Path<RepoPath>,
+    Path(repo_id): Path<RepoId>,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<metrics::RepoMetricsResponse>, (axum::http::StatusCode, String)> {
-    let repo_id = RepoId { owner, repo };
-
     if let Some(cached_metrics) = state.metrics_cache.get(&repo_id).await {
         tracing::debug!(repo_id = %repo_id, "Returning cached metrics");
         return Ok(Json(cached_metrics));
     }
 
-    match state.github_client.fetch_and_calculate_metrics(&state.config, &repo_id.owner, &repo_id.repo).await {
+    match state.github_client.fetch_and_calculate_metrics(&state.config, &repo_id).await {
         Ok(metrics) => {
             state.metrics_cache.insert(repo_id, metrics.clone()).await;
             Ok(Json(metrics))
@@ -212,7 +203,7 @@ async fn preload_single_repo(state: &AppState, repo_id: RepoId) {
         return;
     }
 
-    match state.github_client.fetch_and_calculate_metrics(&state.config, &repo_id.owner, &repo_id.repo).await {
+    match state.github_client.fetch_and_calculate_metrics(&state.config, &repo_id).await {
         Ok(metrics) => {
             state
                 .metrics_cache
