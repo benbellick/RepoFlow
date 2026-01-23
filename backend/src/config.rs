@@ -1,5 +1,5 @@
+use crate::types::RepoId;
 use serde::Deserialize;
-use serde::Serialize;
 use std::time::Duration as StdDuration;
 
 /// Application configuration loaded from environment variables.
@@ -30,7 +30,7 @@ pub struct AppConfig {
     /// Expected format: comma-separated string of "owner/repo" pairs.
     /// Example: "facebook/react,rust-lang/rust"
     #[serde(deserialize_with = "deserialize_popular_repos")]
-    pub popular_repos: Vec<PopularRepo>,
+    pub popular_repos: Vec<RepoId>,
 
     /// Optional GitHub Personal Access Token for higher rate limits.
     pub github_token: Option<String>,
@@ -46,13 +46,7 @@ impl AppConfig {
     }
 }
 
-#[derive(Serialize, Clone, Debug, Deserialize, PartialEq)]
-pub struct PopularRepo {
-    pub owner: String,
-    pub repo: String,
-}
-
-fn deserialize_popular_repos<'de, D>(deserializer: D) -> Result<Vec<PopularRepo>, D::Error>
+fn deserialize_popular_repos<'de, D>(deserializer: D) -> Result<Vec<RepoId>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
@@ -60,12 +54,12 @@ where
     Ok(parse_popular_repos(&s))
 }
 
-fn parse_popular_repos(s: &str) -> Vec<PopularRepo> {
+fn parse_popular_repos(s: &str) -> Vec<RepoId> {
     s.split(',')
         .filter_map(|part| {
             let parts: Vec<&str> = part.trim().split('/').collect();
             if parts.len() == 2 {
-                Some(PopularRepo {
+                Some(RepoId {
                     owner: parts[0].trim().to_string(),
                     repo: parts[1].trim().to_string(),
                 })

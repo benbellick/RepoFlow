@@ -3,6 +3,7 @@ mod config;
 mod fetcher;
 mod github;
 mod metrics;
+mod types;
 
 use axum::{
     extract::{Path, State},
@@ -10,7 +11,7 @@ use axum::{
     Json, Router,
 };
 use cache::MetricsCache;
-use config::{AppConfig, PopularRepo};
+use config::AppConfig;
 use futures::stream::{self, StreamExt};
 use github::GitHubClient;
 use serde::{Deserialize, Serialize};
@@ -19,6 +20,7 @@ use std::sync::Arc;
 use tower_http::services::{ServeDir, ServeFile};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use types::RepoId;
 
 #[derive(Serialize)]
 struct HealthResponse {
@@ -138,7 +140,7 @@ async fn health_check() -> Json<HealthResponse> {
     })
 }
 
-async fn get_popular_repos(State(state): State<Arc<AppState>>) -> Json<Vec<PopularRepo>> {
+async fn get_popular_repos(State(state): State<Arc<AppState>>) -> Json<Vec<RepoId>> {
     Json(state.config.popular_repos.clone())
 }
 
@@ -146,23 +148,20 @@ async fn get_repo_metrics(
     Path(RepoPath { owner, repo }): Path<RepoPath>,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<metrics::RepoMetricsResponse>, (axum::http::StatusCode, String)> {
-    if let Some(cached_metrics) = state.metrics_cache.get(&owner, &repo).await {
-        tracing::debug!(owner = %owner, repo = %repo, "Returning cached metrics");
+    let repo_id = RepoId { owner, repo };
+
+    if let Some(cached_metrics) = state.metrics_cache.get(&repo_id).await {
+        tracing::debug!(repo_id = %repo_id, "Returning cached metrics");
         return Ok(Json(cached_metrics));
     }
 
-    match fetcher::fetch_and_calculate_metrics(&state.github_client, &state.config, &owner, &repo)
-        .await
-    {
+    match fetcher::fetch_and_calculate_metrics(&state.github_client, &state.config, &repo_id.owner, &repo_id.repo).await {
         Ok(metrics) => {
-            state
-                .metrics_cache
-                .insert(owner, repo, metrics.clone())
-                .await;
+            state.metrics_cache.insert(repo_id, metrics.clone()).await;
             Ok(Json(metrics))
         }
         Err(e) => {
-            tracing::error!("Failed to fetch PRs for {}/{}: {}", owner, repo, e);
+            tracing::error!("Failed to fetch PRs for {}: {}", repo_id, e);
 
             if let Some(octocrab::Error::GitHub { source, .. }) =
                 e.downcast_ref::<octocrab::Error>()
@@ -201,7 +200,7 @@ async fn preload_popular_repos(state: Arc<AppState>) {
         .for_each_concurrent(state.config.max_concurrent_preloads, |repo| {
             let state = state.clone();
             async move {
-                preload_single_repo(&state, &repo.owner, &repo.repo).await;
+                preload_single_repo(&state, repo.clone()).await;
             }
         })
         .await;
@@ -209,24 +208,22 @@ async fn preload_popular_repos(state: Arc<AppState>) {
     tracing::info!("Finished preloading popular repositories");
 }
 
-async fn preload_single_repo(state: &AppState, owner: &str, repo: &str) {
+async fn preload_single_repo(state: &AppState, repo_id: RepoId) {
     // Check if already cached (unlikely during startup but good practice)
-    if state.metrics_cache.get(owner, repo).await.is_some() {
+    if state.metrics_cache.get(&repo_id).await.is_some() {
         return;
     }
 
-    match fetcher::fetch_and_calculate_metrics(&state.github_client, &state.config, owner, repo)
-        .await
-    {
+    match fetcher::fetch_and_calculate_metrics(&state.github_client, &state.config, &repo_id.owner, &repo_id.repo).await {
         Ok(metrics) => {
             state
                 .metrics_cache
-                .insert(owner.to_string(), repo.to_string(), metrics)
+                .insert(repo_id.clone(), metrics)
                 .await;
-            tracing::info!(owner = %owner, repo = %repo, "Preloaded metrics");
+            tracing::info!(repo_id = %repo_id, "Preloaded metrics");
         }
         Err(e) => {
-            tracing::warn!(owner = %owner, repo = %repo, error = %e, "Failed to preload metrics");
+            tracing::warn!(repo_id = %repo_id, error = %e, "Failed to preload metrics");
         }
     }
 }
