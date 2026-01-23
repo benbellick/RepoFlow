@@ -29,8 +29,6 @@ struct HealthResponse {
 
 /// Shared application state accessible to all request handlers.
 struct AppState {
-    /// Thread-safe client for interacting with the GitHub API.
-    github_client: GitHubClient,
     /// In-memory cache for repository metrics to avoid redundant API calls and processing.
     metrics_cache: MetricsCache,
     /// Application configuration loaded from environment variables.
@@ -67,7 +65,6 @@ async fn main() {
     let metrics_cache = MetricsCache::new(&config, github_client.clone());
 
     let state = Arc::new(AppState {
-        github_client,
         metrics_cache,
         config,
     });
@@ -139,14 +136,9 @@ async fn get_repo_metrics(
     Path(repo_id): Path<RepoId>,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<metrics::RepoMetricsResponse>, (axum::http::StatusCode, String)> {
-    if let Some(cached_metrics) = state.metrics_cache.get(&repo_id).await {
-        tracing::debug!(repo_id = %repo_id, "Returning cached metrics");
-        return Ok(Json(cached_metrics));
-    }
-
-    match state.github_client.fetch_and_calculate_metrics(&state.config, &repo_id).await {
+    match state.metrics_cache.get(repo_id.clone()).await {
         Ok(metrics) => {
-            state.metrics_cache.insert(repo_id, metrics.clone()).await;
+            tracing::debug!(repo_id = %repo_id, "Returning metrics");
             Ok(Json(metrics))
         }
         Err(e) => {
@@ -198,17 +190,8 @@ async fn preload_popular_repos(state: Arc<AppState>) {
 }
 
 async fn preload_single_repo(state: &AppState, repo_id: RepoId) {
-    // Check if already cached (unlikely during startup but good practice)
-    if state.metrics_cache.get(&repo_id).await.is_some() {
-        return;
-    }
-
-    match state.github_client.fetch_and_calculate_metrics(&state.config, &repo_id).await {
-        Ok(metrics) => {
-            state
-                .metrics_cache
-                .insert(repo_id.clone(), metrics)
-                .await;
+    match state.metrics_cache.get(repo_id.clone()).await {
+        Ok(_) => {
             tracing::info!(repo_id = %repo_id, "Preloaded metrics");
         }
         Err(e) => {
