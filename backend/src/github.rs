@@ -81,11 +81,7 @@ impl GitHubClient {
         repo_id: &RepoId,
     ) -> Result<RepoMetricsResponse> {
         let prs = self
-            .fetch_pull_requests(
-                repo_id,
-                config.pr_fetch_days,
-                config.max_github_api_pages,
-            )
+            .fetch_pull_requests(repo_id, config.pr_fetch_days, config.max_github_api_pages)
             .await?;
 
         let metrics = metrics::calculate_metrics(
