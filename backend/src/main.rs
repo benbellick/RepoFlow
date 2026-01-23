@@ -3,7 +3,6 @@ mod config;
 mod fetcher;
 mod github;
 mod metrics;
-mod types;
 
 use axum::{
     extract::{Path, State},
@@ -20,7 +19,7 @@ use std::sync::Arc;
 use tower_http::services::{ServeDir, ServeFile};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-use types::RepoId;
+use github::RepoId;
 
 #[derive(Serialize)]
 struct HealthResponse {

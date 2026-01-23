@@ -1,4 +1,4 @@
-use crate::types::RepoId;
+use crate::github::RepoId;
 use serde::Deserialize;
 use std::time::Duration as StdDuration;
 

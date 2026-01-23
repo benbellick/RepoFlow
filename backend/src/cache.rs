@@ -2,7 +2,7 @@ use crate::config::AppConfig;
 use crate::fetcher;
 use crate::github::GitHubClient;
 use crate::metrics::RepoMetricsResponse;
-use crate::types::RepoId;
+use crate::github::RepoId;
 use moka::future::Cache;
 use moka::notification::RemovalCause;
 use std::sync::Arc;

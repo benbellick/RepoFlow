@@ -3,6 +3,7 @@ use chrono::{DateTime, Utc};
 use octocrab::models::pulls::PullRequest;
 use octocrab::{Octocrab, Page};
 use serde::{Deserialize, Serialize};
+use std::fmt;
 
 /// Represents the possible states of a GitHub Pull Request in our system.
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
@@ -29,6 +30,21 @@ pub struct GitHubPR {
     pub merged_at: Option<DateTime<Utc>>,
     /// The current operational state of the pull request.
     pub state: PRState,
+}
+
+/// A unique identifier for a GitHub repository.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct RepoId {
+    /// The owner of the repository (e.g., "facebook").
+    pub owner: String,
+    /// The name of the repository (e.g., "react").
+    pub repo: String,
+}
+
+impl fmt::Display for RepoId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}/{}", self.owner, self.repo)
+    }
 }
 
 /// A client wrapper around `octocrab::Octocrab` for fetching repository data.
