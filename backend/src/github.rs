@@ -1,5 +1,7 @@
+use crate::config::AppConfig;
+use crate::metrics::{self, RepoMetricsResponse};
 use anyhow::Result;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 use octocrab::models::pulls::PullRequest;
 use octocrab::{Octocrab, Page};
 use serde::{Deserialize, Serialize};
@@ -68,6 +70,34 @@ impl GitHubClient {
         Ok(Self {
             octocrab: builder.build()?,
         })
+    }
+
+    /// Fetches PRs from GitHub and calculates flow metrics.
+    ///
+    /// This combines data retrieval with domain-specific metric calculation.
+    pub async fn fetch_and_calculate_metrics(
+        &self,
+        config: &AppConfig,
+        owner: &str,
+        repo: &str,
+    ) -> Result<RepoMetricsResponse> {
+        let prs = self
+            .fetch_pull_requests(
+                owner,
+                repo,
+                config.pr_fetch_days,
+                config.max_github_api_pages,
+            )
+            .await?;
+
+        let metrics = metrics::calculate_metrics(
+            &prs,
+            Duration::days(config.metrics_days_to_display),
+            Duration::days(config.metrics_window_size),
+            Utc::now(),
+        );
+
+        Ok(metrics)
     }
 
     /// Retrieves a list of pull requests for a specific repository.

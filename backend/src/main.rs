@@ -1,6 +1,5 @@
 mod cache;
 mod config;
-mod fetcher;
 mod github;
 mod metrics;
 
@@ -154,7 +153,7 @@ async fn get_repo_metrics(
         return Ok(Json(cached_metrics));
     }
 
-    match fetcher::fetch_and_calculate_metrics(&state.github_client, &state.config, &repo_id.owner, &repo_id.repo).await {
+    match state.github_client.fetch_and_calculate_metrics(&state.config, &repo_id.owner, &repo_id.repo).await {
         Ok(metrics) => {
             state.metrics_cache.insert(repo_id, metrics.clone()).await;
             Ok(Json(metrics))
@@ -213,7 +212,7 @@ async fn preload_single_repo(state: &AppState, repo_id: RepoId) {
         return;
     }
 
-    match fetcher::fetch_and_calculate_metrics(&state.github_client, &state.config, &repo_id.owner, &repo_id.repo).await {
+    match state.github_client.fetch_and_calculate_metrics(&state.config, &repo_id.owner, &repo_id.repo).await {
         Ok(metrics) => {
             state
                 .metrics_cache

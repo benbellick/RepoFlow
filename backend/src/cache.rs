@@ -1,5 +1,4 @@
 use crate::config::AppConfig;
-use crate::fetcher;
 use crate::github::GitHubClient;
 use crate::metrics::RepoMetricsResponse;
 use crate::github::RepoId;
@@ -44,7 +43,7 @@ impl MetricsCache {
             while let Some(repo_id) = rx.recv().await {
                 tracing::info!(repo_id = %repo_id, "Refreshing expired cache entry");
 
-                match fetcher::fetch_and_calculate_metrics(&client_clone, &config_clone, &repo_id.owner, &repo_id.repo).await {
+                match client_clone.fetch_and_calculate_metrics(&config_clone, &repo_id.owner, &repo_id.repo).await {
                     Ok(metrics) => {
                         cache_clone.insert(repo_id.clone(), metrics).await;
                         tracing::info!(repo_id = %repo_id, "Successfully refreshed cache");
