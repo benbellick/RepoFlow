@@ -11,18 +11,17 @@ use crate::config::AppConfig;
 use crate::github::{GitHubClient, RepoId};
 use crate::metrics::RepoMetricsResponse;
 use moka::future::Cache;
-use std::sync::Arc;
 use std::time::Duration;
 
 #[derive(Clone)]
 pub struct MetricsCache {
     cache: Cache<RepoId, RepoMetricsResponse>,
     client: GitHubClient,
-    config: Arc<AppConfig>,
+    config: AppConfig,
 }
 
 impl MetricsCache {
-    pub fn new(config: Arc<AppConfig>, client: GitHubClient) -> Self {
+    pub fn new(config: &AppConfig, client: GitHubClient) -> Self {
         let cache = Cache::builder()
             .max_capacity(config.cache_max_capacity)
             .time_to_live(config.cache_ttl())
@@ -31,7 +30,7 @@ impl MetricsCache {
         let metrics_cache = Self {
             cache,
             client,
-            config,
+            config: config.clone(),
         };
 
         metrics_cache.start_background_refresh();

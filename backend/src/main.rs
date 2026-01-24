@@ -31,10 +31,7 @@ struct AppState {
     /// In-memory cache for repository metrics to avoid redundant API calls and processing.
     metrics_cache: MetricsCache,
     /// Application configuration loaded from environment variables.
-    config: Arc<AppConfig>,
-    /// Client for interacting with the GitHub API.
-    #[allow(dead_code)]
-    github_client: GitHubClient,
+    config: AppConfig,
 }
 
 #[tokio::main]
@@ -45,7 +42,7 @@ async fn main() {
     init_tracing();
 
     let config = match AppConfig::from_env() {
-        Ok(c) => Arc::new(c),
+        Ok(c) => c,
         Err(e) => {
             tracing::error!("Failed to load configuration: {}. Exiting.", e);
             std::process::exit(1);
@@ -64,12 +61,11 @@ async fn main() {
         }
     };
 
-    let metrics_cache = MetricsCache::new(config.clone(), github_client.clone());
+    let metrics_cache = MetricsCache::new(&config, github_client);
 
     let state = Arc::new(AppState {
         metrics_cache,
         config,
-        github_client,
     });
 
     let serve_dir = ServeDir::new("dist").not_found_service(ServeFile::new("dist/index.html"));
