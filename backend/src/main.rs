@@ -1,5 +1,4 @@
 mod config;
-mod github;
 mod metrics;
 mod querier;
 
@@ -8,8 +7,7 @@ use axum::{
     routing::get,
     Json, Router,
 };
-use config::AppConfig;
-use github::RepoId;
+use config::{AppConfig, RepoId};
 use querier::MetricsQuerier;
 use serde::Serialize;
 use std::net::SocketAddr;

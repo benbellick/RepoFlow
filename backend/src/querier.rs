@@ -7,9 +7,8 @@
 //! 3. Calculating domain-specific metrics from the raw data.
 //! 4. Proactively refreshing popular repositories in the background.
 
-use crate::config::AppConfig;
-use crate::github::{GitHubPR, PRState, RepoId};
-use crate::metrics::{self, RepoMetricsResponse};
+use crate::config::{AppConfig, RepoId};
+use crate::metrics::{self, GitHubPR, PRState, RepoMetricsResponse};
 use chrono::{Duration, Utc};
 use moka::future::Cache;
 use octocrab::models::pulls::PullRequest;

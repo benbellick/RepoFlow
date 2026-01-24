@@ -4,9 +4,24 @@
 //! It defines the `AppConfig` struct which governs behavior such as API rate limits,
 //! cache TTLs, and the list of popular repositories to preload.
 
-use crate::github::RepoId;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use std::fmt;
 use std::time::Duration as StdDuration;
+
+/// A unique identifier for a GitHub repository.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct RepoId {
+    /// The owner of the repository (e.g., "facebook").
+    pub owner: String,
+    /// The name of the repository (e.g., "react").
+    pub repo: String,
+}
+
+impl fmt::Display for RepoId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}/{}", self.owner, self.repo)
+    }
+}
 
 /// Application configuration loaded from environment variables.
 #[derive(Clone, Debug, Deserialize)]
