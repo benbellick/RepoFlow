@@ -1,17 +1,16 @@
-mod cache;
 mod config;
 mod github;
 mod metrics;
+mod querier;
 
 use axum::{
     extract::{Path, State},
     routing::get,
     Json, Router,
 };
-use cache::MetricsCache;
 use config::AppConfig;
-use github::GitHubClient;
 use github::RepoId;
+use querier::MetricsQuerier;
 use serde::Serialize;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -28,8 +27,8 @@ struct HealthResponse {
 
 /// Shared application state accessible to all request handlers.
 struct AppState {
-    /// In-memory cache for repository metrics to avoid redundant API calls and processing.
-    metrics_cache: MetricsCache,
+    /// Service for querying repository metrics.
+    querier: MetricsQuerier,
     /// Application configuration loaded from environment variables.
     config: AppConfig,
 }
@@ -53,20 +52,15 @@ async fn main() {
         tracing::warn!("Running without GITHUB_TOKEN. Rate limits will be strict.");
     }
 
-    let github_client = match GitHubClient::new(config.github_token.clone()) {
-        Ok(client) => client,
+    let querier = match MetricsQuerier::new(&config) {
+        Ok(q) => q,
         Err(e) => {
-            tracing::error!("Failed to initialize GitHub client: {}. Exiting.", e);
+            tracing::error!("Failed to initialize MetricsQuerier: {}. Exiting.", e);
             std::process::exit(1);
         }
     };
 
-    let metrics_cache = MetricsCache::new(&config, github_client);
-
-    let state = Arc::new(AppState {
-        metrics_cache,
-        config,
-    });
+    let state = Arc::new(AppState { querier, config });
 
     let serve_dir = ServeDir::new("dist").not_found_service(ServeFile::new("dist/index.html"));
 
@@ -130,7 +124,7 @@ async fn get_repo_metrics(
     Path(repo_id): Path<RepoId>,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<metrics::RepoMetricsResponse>, (axum::http::StatusCode, String)> {
-    match state.metrics_cache.get(repo_id.clone()).await {
+    match state.querier.get(repo_id.clone()).await {
         Ok(metrics) => {
             tracing::debug!(repo_id = %repo_id, "Returning metrics");
             Ok(Json(metrics))
