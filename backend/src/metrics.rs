@@ -1,10 +1,36 @@
-use crate::github::GitHubPR;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Utc};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 const END_OF_DAY_HOUR: u32 = 23;
 const END_OF_DAY_MIN: u32 = 59;
 const END_OF_DAY_SEC: u32 = 59;
+
+/// Represents the possible states of a GitHub Pull Request in our system.
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum PRState {
+    /// The PR is currently open and active.
+    Open,
+    /// The PR has been closed without being merged.
+    Closed,
+    /// The PR has been successfully merged into the target branch.
+    Merged,
+    /// The state of the PR could not be determined.
+    Unknown,
+}
+
+/// A simplified representation of a GitHub Pull Request used for calculating flow metrics.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GitHubPR {
+    /// The unique GitHub database ID for this pull request.
+    pub id: u64,
+    /// The exact timestamp when the pull request was first opened.
+    pub created_at: DateTime<Utc>,
+    /// The timestamp when the pull request was merged (None if not merged).
+    pub merged_at: Option<DateTime<Utc>>,
+    /// The current operational state of the pull request.
+    pub state: PRState,
+}
 
 /// The root response structure for repository metrics.
 #[derive(Debug, Serialize, Clone)]
@@ -141,7 +167,6 @@ fn calculate_day_metrics(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::github::PRState;
     use chrono::TimeZone;
 
     #[test]

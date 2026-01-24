@@ -1,18 +1,15 @@
 mod config;
-mod github;
 mod metrics;
+mod querier;
 
 use axum::{
     extract::{Path, State},
     routing::get,
     Json, Router,
 };
-use chrono::{Duration, Utc};
-use config::{AppConfig, PopularRepo};
-use futures::stream::{self, StreamExt};
-use github::GitHubClient;
-use moka::future::Cache;
-use serde::{Deserialize, Serialize};
+use config::{AppConfig, RepoId};
+use querier::MetricsQuerier;
+use serde::Serialize;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tower_http::services::{ServeDir, ServeFile};
@@ -28,19 +25,18 @@ struct HealthResponse {
 
 /// Shared application state accessible to all request handlers.
 struct AppState {
-    /// Thread-safe client for interacting with the GitHub API.
-    github_client: GitHubClient,
-    /// In-memory cache for repository metrics to avoid redundant API calls and processing.
-    metrics_cache: Cache<String, metrics::RepoMetricsResponse>,
+    /// Service for querying repository metrics.
+    querier: MetricsQuerier,
     /// Application configuration loaded from environment variables.
     config: AppConfig,
 }
 
-/// Parameters extracted from the URL path /api/repos/:owner/:repo/metrics
-#[derive(Deserialize)]
-struct RepoPath {
-    owner: String,
-    repo: String,
+impl AppState {
+    /// Initializes the application state, including the metrics querier.
+    pub fn new(config: AppConfig) -> anyhow::Result<Self> {
+        let querier = MetricsQuerier::new(&config)?;
+        Ok(Self { querier, config })
+    }
 }
 
 #[tokio::main]
@@ -62,29 +58,13 @@ async fn main() {
         tracing::warn!("Running without GITHUB_TOKEN. Rate limits will be strict.");
     }
 
-    let github_client = match GitHubClient::new(config.github_token.clone()) {
-        Ok(client) => client,
+    let state = match AppState::new(config) {
+        Ok(s) => Arc::new(s),
         Err(e) => {
-            tracing::error!("Failed to initialize GitHub client: {}. Exiting.", e);
+            tracing::error!("Failed to initialize application state: {}. Exiting.", e);
             std::process::exit(1);
         }
     };
-
-    let metrics_cache = Cache::builder()
-        .max_capacity(config.cache_max_capacity)
-        .time_to_live(config.cache_ttl())
-        .build();
-
-    let state = Arc::new(AppState {
-        github_client,
-        metrics_cache,
-        config,
-    });
-
-    let state_clone = state.clone();
-    tokio::spawn(async move {
-        preload_popular_repos(state_clone).await;
-    });
 
     let serve_dir = ServeDir::new("dist").not_found_service(ServeFile::new("dist/index.html"));
 
@@ -140,44 +120,21 @@ async fn health_check() -> Json<HealthResponse> {
     })
 }
 
-async fn get_popular_repos(State(state): State<Arc<AppState>>) -> Json<Vec<PopularRepo>> {
+async fn get_popular_repos(State(state): State<Arc<AppState>>) -> Json<Vec<RepoId>> {
     Json(state.config.popular_repos.clone())
 }
 
 async fn get_repo_metrics(
-    Path(RepoPath { owner, repo }): Path<RepoPath>,
+    Path(repo_id): Path<RepoId>,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<metrics::RepoMetricsResponse>, (axum::http::StatusCode, String)> {
-    let cache_key = get_cache_key(&owner, &repo);
-
-    if let Some(cached_metrics) = state.metrics_cache.get(&cache_key).await {
-        tracing::debug!(owner = %owner, repo = %repo, "Returning cached metrics");
-        return Ok(Json(cached_metrics));
-    }
-
-    let metrics = fetch_and_calculate_metrics(&state, &owner, &repo).await?;
-
-    state.metrics_cache.insert(cache_key, metrics.clone()).await;
-
-    Ok(Json(metrics))
-}
-
-async fn fetch_and_calculate_metrics(
-    state: &AppState,
-    owner: &str,
-    repo: &str,
-) -> Result<metrics::RepoMetricsResponse, (axum::http::StatusCode, String)> {
-    let prs = state
-        .github_client
-        .fetch_pull_requests(
-            owner,
-            repo,
-            state.config.pr_fetch_days,
-            state.config.max_github_api_pages,
-        )
-        .await
-        .map_err(|e| {
-            tracing::error!("Failed to fetch PRs for {}/{}: {}", owner, repo, e);
+    match state.querier.get(repo_id.clone()).await {
+        Ok(metrics) => {
+            tracing::debug!(repo_id = %repo_id, "Returning metrics");
+            Ok(Json(metrics))
+        }
+        Err(e) => {
+            tracing::error!("Failed to fetch PRs for {}: {}", repo_id, e);
 
             if let Some(octocrab::Error::GitHub { source, .. }) =
                 e.downcast_ref::<octocrab::Error>()
@@ -185,68 +142,25 @@ async fn fetch_and_calculate_metrics(
                 // TODO(#29): Refactor this brittle string matching.
                 // We should inspect the raw HTTP status code or use a strongly-typed error variant if available.
                 if source.message.to_lowercase().contains("rate limit") {
-                    return (
+                    return Err((
                         axum::http::StatusCode::TOO_MANY_REQUESTS,
                         "GitHub Rate Limit Exceeded".to_string(),
-                    );
+                    ));
                 }
                 if source.message.to_lowercase().contains("not found") {
-                    return (
+                    return Err((
                         axum::http::StatusCode::NOT_FOUND,
                         "Repository Not Found".to_string(),
-                    );
+                    ));
                 }
             }
 
-            (
+            Err((
                 axum::http::StatusCode::INTERNAL_SERVER_ERROR,
                 "Internal Server Error".to_string(),
-            )
-        })?;
-
-    let metrics = metrics::calculate_metrics(
-        &prs,
-        Duration::days(state.config.metrics_days_to_display),
-        Duration::days(state.config.metrics_window_size),
-        Utc::now(),
-    );
-
-    Ok(metrics)
-}
-
-async fn preload_popular_repos(state: Arc<AppState>) {
-    tracing::info!(
-        "Preloading {} popular repositories",
-        state.config.popular_repos.len()
-    );
-
-    stream::iter(&state.config.popular_repos)
-        .for_each_concurrent(state.config.max_concurrent_preloads, |repo| {
-            let state = state.clone();
-            async move {
-                preload_single_repo(&state, &repo.owner, &repo.repo).await;
-            }
-        })
-        .await;
-
-    tracing::info!("Finished preloading popular repositories");
-}
-
-async fn preload_single_repo(state: &AppState, owner: &str, repo: &str) {
-    let cache_key = get_cache_key(owner, repo);
-    match fetch_and_calculate_metrics(state, owner, repo).await {
-        Ok(metrics) => {
-            state.metrics_cache.insert(cache_key, metrics).await;
-            tracing::info!(owner = %owner, repo = %repo, "Preloaded metrics");
-        }
-        Err((status, msg)) => {
-            tracing::warn!(owner = %owner, repo = %repo, status = ?status, msg = %msg, "Failed to preload metrics");
+            ))
         }
     }
-}
-
-fn get_cache_key(owner: &str, repo: &str) -> String {
-    format!("owner::{}/repo::{}", owner, repo)
 }
 
 async fn shutdown_signal() {
