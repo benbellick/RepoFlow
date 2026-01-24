@@ -72,7 +72,8 @@ impl MetricsCache {
                 interval.tick().await;
 
                 for repo_id in &config.popular_repos {
-                    if let Ok(metrics) = client.fetch_and_calculate_metrics(&config, repo_id).await {
+                    if let Ok(metrics) = client.fetch_and_calculate_metrics(&config, repo_id).await
+                    {
                         cache.insert(repo_id.clone(), metrics).await;
                     }
                 }
