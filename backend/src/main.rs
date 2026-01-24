@@ -30,8 +30,6 @@ struct HealthResponse {
 struct AppState {
     /// In-memory cache for repository metrics to avoid redundant API calls and processing.
     metrics_cache: MetricsCache,
-    /// Application configuration loaded from environment variables.
-    config: AppConfig,
 }
 
 #[tokio::main]
@@ -63,10 +61,7 @@ async fn main() {
 
     let metrics_cache = MetricsCache::new(&config, github_client.clone());
 
-    let state = Arc::new(AppState {
-        metrics_cache,
-        config,
-    });
+    let state = Arc::new(AppState { metrics_cache });
 
     let serve_dir = ServeDir::new("dist").not_found_service(ServeFile::new("dist/index.html"));
 
@@ -123,7 +118,7 @@ async fn health_check() -> Json<HealthResponse> {
 }
 
 async fn get_popular_repos(State(state): State<Arc<AppState>>) -> Json<Vec<RepoId>> {
-    Json(state.config.popular_repos.clone())
+    Json(state.metrics_cache.popular_repos())
 }
 
 async fn get_repo_metrics(

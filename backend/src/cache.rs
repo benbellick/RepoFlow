@@ -54,6 +54,11 @@ impl MetricsCache {
         Ok(metrics)
     }
 
+    /// Returns the list of popular repositories configured for the application.
+    pub fn popular_repos(&self) -> Vec<RepoId> {
+        self.config.popular_repos.clone()
+    }
+
     /// Starts a background task that periodically refreshes metrics for popular repositories.
     ///
     /// By updating the cache before entries expire, we ensure that popular repositories
