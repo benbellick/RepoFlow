@@ -1,3 +1,9 @@
+//! GitHub API client and data models.
+//!
+//! This module provides the `GitHubClient` wrapper around `octocrab` for interacting with
+//! the GitHub REST API. It also defines domain-specific types like `RepoId` and `GitHubPR`
+//! that abstract away the complexity of the raw GitHub API responses.
+
 use crate::config::AppConfig;
 use crate::metrics::{self, RepoMetricsResponse};
 use anyhow::Result;

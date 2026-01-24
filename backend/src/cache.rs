@@ -1,3 +1,12 @@
+//! InMemory caching layer for repository metrics.
+//!
+//! This module implements a read-through cache (`MetricsCache`) that stores calculated metrics
+//! for requested repositories. It improves performance and reduces GitHub API usage by serving
+//! cached data for repeat requests.
+//!
+//! In addition to standard caching, it features a background refresh mechanism that proactively
+//! updates "popular" repositories (defined in config) to ensure they are always warm and fresh.
+
 use crate::config::AppConfig;
 use crate::github::{GitHubClient, RepoId};
 use crate::metrics::RepoMetricsResponse;

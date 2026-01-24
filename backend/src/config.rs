@@ -1,3 +1,9 @@
+//! Application configuration and environment variable parsing.
+//!
+//! This module handles loading configuration settings from the environment (e.g., .env file).
+//! It defines the `AppConfig` struct which governs behavior such as API rate limits,
+//! cache TTLs, and the list of popular repositories to preload.
+
 use crate::github::RepoId;
 use serde::Deserialize;
 use std::time::Duration as StdDuration;
