@@ -57,9 +57,7 @@ impl MetricsQuerier {
             return Ok(metrics);
         }
 
-        let metrics = self
-            .fetch_and_calculate_metrics(&repo_id)
-            .await?;
+        let metrics = self.fetch_and_calculate_metrics(&repo_id).await?;
 
         self.cache.insert(repo_id, metrics.clone()).await;
 
@@ -94,7 +92,11 @@ impl MetricsQuerier {
         repo_id: &RepoId,
     ) -> anyhow::Result<RepoMetricsResponse> {
         let prs = self
-            .fetch_pull_requests(repo_id, self.config.pr_fetch_days, self.config.max_github_api_pages)
+            .fetch_pull_requests(
+                repo_id,
+                self.config.pr_fetch_days,
+                self.config.max_github_api_pages,
+            )
             .await?;
 
         let metrics = metrics::calculate_metrics(
