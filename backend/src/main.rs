@@ -31,6 +31,14 @@ struct AppState {
     config: AppConfig,
 }
 
+impl AppState {
+    /// Initializes the application state, including the metrics querier.
+    pub fn new(config: AppConfig) -> anyhow::Result<Self> {
+        let querier = MetricsQuerier::new(&config)?;
+        Ok(Self { querier, config })
+    }
+}
+
 #[tokio::main]
 async fn main() {
     // Load environment variables from .env file if it exists
@@ -50,15 +58,13 @@ async fn main() {
         tracing::warn!("Running without GITHUB_TOKEN. Rate limits will be strict.");
     }
 
-    let querier = match MetricsQuerier::new(&config) {
-        Ok(q) => q,
+    let state = match AppState::new(config) {
+        Ok(s) => Arc::new(s),
         Err(e) => {
-            tracing::error!("Failed to initialize MetricsQuerier: {}. Exiting.", e);
+            tracing::error!("Failed to initialize application state: {}. Exiting.", e);
             std::process::exit(1);
         }
     };
-
-    let state = Arc::new(AppState { querier, config });
 
     let serve_dir = ServeDir::new("dist").not_found_service(ServeFile::new("dist/index.html"));
 
