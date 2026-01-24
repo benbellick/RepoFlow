@@ -31,15 +31,18 @@ impl MetricsCache {
 
     /// Retrieves metrics for a repository, fetching them if not cached (read-through).
     pub async fn get(&self, repo_id: RepoId) -> anyhow::Result<RepoMetricsResponse> {
+        // 1. Check the cache first
         if let Some(metrics) = self.cache.get(&repo_id).await {
             return Ok(metrics);
         }
 
+        // 2. If missing, fetch from GitHub directly (using references, no cloning needed!)
         let metrics = self
             .client
             .fetch_and_calculate_metrics(&self.config, &repo_id)
             .await?;
 
+        // 3. Store in cache and return
         self.cache.insert(repo_id, metrics.clone()).await;
 
         Ok(metrics)
@@ -59,15 +62,11 @@ impl MetricsCache {
             let mut interval =
                 tokio::time::interval(Duration::from_secs(config.cache_ttl_seconds / 2));
 
-            // Skip the immediate first tick (we assume the app preloads them on startup or first request)
-            interval.tick().await;
-
             loop {
                 interval.tick().await;
 
                 for repo_id in &config.popular_repos {
-                    if let Ok(metrics) = client.fetch_and_calculate_metrics(&config, repo_id).await
-                    {
+                    if let Ok(metrics) = client.fetch_and_calculate_metrics(&config, repo_id).await {
                         cache.insert(repo_id.clone(), metrics).await;
                     }
                 }

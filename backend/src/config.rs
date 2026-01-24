@@ -23,9 +23,6 @@ pub struct AppConfig {
     /// Maximum number of entries to keep in the metrics cache.
     pub cache_max_capacity: u64,
 
-    /// Maximum number of concurrent requests for preloading popular repositories.
-    pub max_concurrent_preloads: usize,
-
     /// List of popular repositories to preload.
     /// Expected format: comma-separated string of "owner/repo" pairs.
     /// Example: "facebook/react,rust-lang/rust"
@@ -86,7 +83,6 @@ mod tests {
         env::set_var("METRICS_WINDOW_SIZE", "15");
         env::set_var("CACHE_TTL_SECONDS", "3600");
         env::set_var("CACHE_MAX_CAPACITY", "500");
-        env::set_var("MAX_CONCURRENT_PRELOADS", "2");
         env::set_var("POPULAR_REPOS", "owner1/repo1,owner2/repo2");
 
         let config = AppConfig::from_env().expect("Failed to load config");
@@ -97,7 +93,6 @@ mod tests {
         assert_eq!(config.metrics_window_size, 15);
         assert_eq!(config.cache_ttl_seconds, 3600);
         assert_eq!(config.cache_max_capacity, 500);
-        assert_eq!(config.max_concurrent_preloads, 2);
         assert_eq!(config.popular_repos.len(), 2);
         assert_eq!(config.popular_repos[0].owner, "owner1");
         assert_eq!(config.popular_repos[0].repo, "repo1");
@@ -109,7 +104,6 @@ mod tests {
         env::remove_var("METRICS_WINDOW_SIZE");
         env::remove_var("CACHE_TTL_SECONDS");
         env::remove_var("CACHE_MAX_CAPACITY");
-        env::remove_var("MAX_CONCURRENT_PRELOADS");
         env::remove_var("POPULAR_REPOS");
     }
 

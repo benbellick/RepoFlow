@@ -10,15 +10,14 @@ use axum::{
 };
 use cache::MetricsCache;
 use config::AppConfig;
-use futures::stream::{self, StreamExt};
 use github::GitHubClient;
-use github::RepoId;
 use serde::Serialize;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tower_http::services::{ServeDir, ServeFile};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use github::RepoId;
 
 #[derive(Serialize)]
 struct HealthResponse {
@@ -67,11 +66,6 @@ async fn main() {
     let state = Arc::new(AppState {
         metrics_cache,
         config,
-    });
-
-    let state_clone = state.clone();
-    tokio::spawn(async move {
-        preload_popular_repos(state_clone).await;
     });
 
     let serve_dir = ServeDir::new("dist").not_found_service(ServeFile::new("dist/index.html"));
@@ -167,35 +161,6 @@ async fn get_repo_metrics(
                 axum::http::StatusCode::INTERNAL_SERVER_ERROR,
                 "Internal Server Error".to_string(),
             ))
-        }
-    }
-}
-
-async fn preload_popular_repos(state: Arc<AppState>) {
-    tracing::info!(
-        "Preloading {} popular repositories",
-        state.config.popular_repos.len()
-    );
-
-    stream::iter(&state.config.popular_repos)
-        .for_each_concurrent(state.config.max_concurrent_preloads, |repo| {
-            let state = state.clone();
-            async move {
-                preload_single_repo(&state, repo.clone()).await;
-            }
-        })
-        .await;
-
-    tracing::info!("Finished preloading popular repositories");
-}
-
-async fn preload_single_repo(state: &AppState, repo_id: RepoId) {
-    match state.metrics_cache.get(repo_id.clone()).await {
-        Ok(_) => {
-            tracing::info!(repo_id = %repo_id, "Preloaded metrics");
-        }
-        Err(e) => {
-            tracing::warn!(repo_id = %repo_id, error = %e, "Failed to preload metrics");
         }
     }
 }
