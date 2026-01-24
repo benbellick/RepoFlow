@@ -12,6 +12,7 @@ use octocrab::models::pulls::PullRequest;
 use octocrab::{Octocrab, Page};
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use axum::http::Uri;
 
 /// Represents the possible states of a GitHub Pull Request in our system.
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
@@ -119,14 +120,7 @@ impl GitHubClient {
         let mut prs = Vec::new();
 
         let mut current_page = self
-            .octocrab
-            .pulls(&repo_id.owner, &repo_id.repo)
-            .list()
-            .state(octocrab::params::State::All)
-            .sort(octocrab::params::pulls::Sort::Created)
-            .direction(octocrab::params::Direction::Descending)
-            .per_page(100)
-            .send()
+            .fetch_initial_page_with_retry(repo_id)
             .await?;
 
         for _ in 1..=max_pages {
@@ -138,7 +132,10 @@ impl GitHubClient {
                 break;
             }
 
-            if let Some(next_page) = self.octocrab.get_page(&current_page.next).await? {
+            if let Some(next_page) = self
+                .fetch_next_page_with_retry(&current_page.next)
+                .await?
+            {
                 current_page = next_page;
             } else {
                 break;
@@ -149,6 +146,69 @@ impl GitHubClient {
         prs.retain(|pr| pr.created_at >= cutoff_date);
 
         Ok(prs)
+    }
+
+    async fn fetch_initial_page_with_retry(
+        &self,
+        repo_id: &RepoId,
+    ) -> Result<Page<PullRequest>> {
+        let mut attempt = 0;
+        loop {
+            attempt += 1;
+            // We must reconstruct the builder on each attempt because send() consumes it
+            let result = self
+                .octocrab
+                .pulls(&repo_id.owner, &repo_id.repo)
+                .list()
+                .state(octocrab::params::State::All)
+                .sort(octocrab::params::pulls::Sort::Created)
+                .direction(octocrab::params::Direction::Descending)
+                .per_page(100)
+                .send()
+                .await;
+
+            match result {
+                Ok(page) => return Ok(page),
+                Err(e) => {
+                    if attempt >= 3 {
+                        return Err(e.into());
+                    }
+                    tracing::warn!(
+                        repo_id = %repo_id,
+                        attempt,
+                        error = %e,
+                        "Failed to fetch initial PR page, retrying..."
+                    );
+                    tokio::time::sleep(std::time::Duration::from_millis(500 * attempt)).await;
+                }
+            }
+        }
+    }
+
+    async fn fetch_next_page_with_retry(
+        &self,
+        url: &Option<Uri>,
+    ) -> Result<Option<Page<PullRequest>>> {
+        let mut attempt = 0;
+        loop {
+            attempt += 1;
+            let result = self.octocrab.get_page(url).await;
+
+            match result {
+                Ok(page) => return Ok(page),
+                Err(e) => {
+                    if attempt >= 3 {
+                        return Err(e.into());
+                    }
+                    tracing::warn!(
+                        attempt,
+                        error = %e,
+                        "Failed to fetch next PR page, retrying..."
+                    );
+                    tokio::time::sleep(std::time::Duration::from_millis(500 * attempt)).await;
+                }
+            }
+        }
     }
 
     /// Processes a single page of Pull Requests, converting them to our internal type.
