@@ -11,17 +11,18 @@ use crate::config::AppConfig;
 use crate::github::{GitHubClient, RepoId};
 use crate::metrics::RepoMetricsResponse;
 use moka::future::Cache;
+use std::sync::Arc;
 use std::time::Duration;
 
 #[derive(Clone)]
 pub struct MetricsCache {
     cache: Cache<RepoId, RepoMetricsResponse>,
     client: GitHubClient,
-    config: AppConfig,
+    config: Arc<AppConfig>,
 }
 
 impl MetricsCache {
-    pub fn new(config: &AppConfig, client: GitHubClient) -> Self {
+    pub fn new(config: Arc<AppConfig>, client: GitHubClient) -> Self {
         let cache = Cache::builder()
             .max_capacity(config.cache_max_capacity)
             .time_to_live(config.cache_ttl())
@@ -30,7 +31,7 @@ impl MetricsCache {
         let metrics_cache = Self {
             cache,
             client,
-            config: config.clone(),
+            config,
         };
 
         metrics_cache.start_background_refresh();
@@ -52,11 +53,6 @@ impl MetricsCache {
         self.cache.insert(repo_id, metrics.clone()).await;
 
         Ok(metrics)
-    }
-
-    /// Returns the list of popular repositories configured for the application.
-    pub fn popular_repos(&self) -> Vec<RepoId> {
-        self.config.popular_repos.clone()
     }
 
     /// Starts a background task that periodically refreshes metrics for popular repositories.
