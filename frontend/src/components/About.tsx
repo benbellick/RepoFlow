@@ -48,7 +48,7 @@ export const About = ({ isOpen, onClose }: AboutProps): JSX.Element | null => {
 
           <h2
             id="about-title"
-            className="text-3xl font-black uppercase underline decoration-main decoration-4 mb-6"
+            className="text-2xl md:text-3xl font-black uppercase underline decoration-main decoration-4 mb-6"
           >
             About RepoFlow
           </h2>

@@ -61,7 +61,7 @@ export const StatCard = ({
           </div>
         )}
       </div>
-      <h3 className="text-4xl font-heading mb-2">{value}</h3>
+      <h3 className="text-3xl md:text-4xl font-heading mb-2">{value}</h3>
       {trend && (
         <div className="flex items-center gap-1 font-heading text-sm">
           {renderTrendIcon()}

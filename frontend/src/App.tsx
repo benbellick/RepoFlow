@@ -77,18 +77,18 @@ function App(): JSX.Element {
   const hasData = data.some((day) => day.opened > 0 || day.merged > 0)
 
   return (
-    <div className="min-h-screen bg-bg p-8 font-sans selection:bg-main">
+    <div className="min-h-screen bg-bg p-4 md:p-8 font-sans selection:bg-main">
       <About isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} />
 
-      <header className="max-w-7xl mx-auto mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
+      <header className="max-w-7xl mx-auto mb-8 md:mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
-          <h1 className="text-6xl mb-2 italic tracking-tighter text-black font-black uppercase underline decoration-main decoration-8">
+          <h1 className="text-4xl md:text-6xl mb-2 italic tracking-tighter text-black font-black uppercase underline decoration-main decoration-8">
             RepoFlow
           </h1>
-          <p className="text-xl font-base">Measure OSS contribution efficiency.</p>
+          <p className="text-lg md:text-xl font-base">Measure OSS contribution efficiency.</p>
         </div>
 
-        <form onSubmit={handleSearch} className="flex gap-4 w-full md:w-auto">
+        <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
           <Input
             value={repoUrl}
             onChange={(e: ChangeEvent<HTMLInputElement>) => setRepoUrl(e.target.value)}
@@ -102,10 +102,12 @@ function App(): JSX.Element {
       </header>
 
       <main className="max-w-7xl mx-auto">
-        <section className="mb-12">
+        <section className="mb-8 md:mb-12">
           <div className="flex items-center gap-2 mb-4">
             <Star className="text-black fill-main" size={24} />
-            <h2 className="text-2xl font-black uppercase tracking-tight">Popular Repositories</h2>
+            <h2 className="text-xl md:text-2xl font-black uppercase tracking-tight">
+              Popular Repositories
+            </h2>
           </div>
           <div className="flex flex-wrap gap-3">
             {popularRepos.map((pr) => (
@@ -186,7 +188,7 @@ function App(): JSX.Element {
         </div>
       </main>
 
-      <footer className="max-w-7xl mx-auto mt-12 pt-8 border-t-4 border-black font-base flex justify-between items-center">
+      <footer className="max-w-7xl mx-auto mt-12 pt-8 border-t-4 border-black font-base flex flex-col sm:flex-row justify-between items-center gap-4">
         <p>RepoFlow - Measuring PR Liquidity</p>
         <div className="flex gap-6">
           <a href="https://github.com/benbellick/RepoFlow" className="hover:underline font-heading">
