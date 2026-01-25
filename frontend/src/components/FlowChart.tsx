@@ -69,6 +69,15 @@ export const FlowChart = ({ data }: FlowChartProps): JSX.Element => {
             activeDot={{ r: 8 }}
             name="PRs Merged"
           />
+          <Line
+            type="monotone"
+            dataKey="spread"
+            stroke="#000"
+            strokeWidth={2}
+            strokeDasharray="5 5"
+            dot={false}
+            name="The Spread"
+          />
         </LineChart>
       </ResponsiveContainer>
     </Card>

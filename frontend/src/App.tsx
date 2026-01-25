@@ -151,7 +151,7 @@ function App(): JSX.Element {
               value={summary.current_spread}
               trend={summary.is_widening ? TrendDirection.UP : TrendDirection.DOWN}
               trendLabel={summary.is_widening ? 'Widening' : 'Tightening'}
-              color="bg-main"
+              color={summary.is_widening ? 'bg-red-400' : 'bg-main'}
               description="Difference between opened and merged PRs. A widening spread means the backlog is growing."
             />
             <StatCard
