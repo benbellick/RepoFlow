@@ -37,7 +37,7 @@ function App(): JSX.Element {
       const response = await fetchRepoMetrics(repoDetails.owner, repoDetails.repo)
       setData(response.time_series)
       setSummary(response.summary)
-      setActiveRepo({ owner: repoDetails.owner, repo: repoDetails.repo })
+      setActiveRepo(repoDetails)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred')
     } finally {
