@@ -36,13 +36,7 @@ describe('StatCard', () => {
   })
 
   it('shows tooltip trigger icon when description is provided', () => {
-    render(
-      <StatCard
-        label="With Tooltip"
-        value="789"
-        description="This is a description"
-      />
-    )
+    render(<StatCard label="With Tooltip" value="789" description="This is a description" />)
     expect(screen.getByText('This is a description')).toBeTruthy()
     // Check if the Info icon (lucide-react) is rendered.
     // Lucide icons usually render as SVGs. We can check if an SVG exists within the label container.
