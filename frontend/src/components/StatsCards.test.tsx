@@ -11,25 +11,12 @@ describe('StatCard', () => {
   })
 
   it('renders trend information when provided', () => {
-    render(
-      <StatCard
-        label="With Trend"
-        value="456"
-        trend={TrendDirection.UP}
-        trendLabel="+10%"
-      />
-    )
+    render(<StatCard label="With Trend" value="456" trend={TrendDirection.UP} trendLabel="+10%" />)
     expect(screen.getByText('+10%')).toBeTruthy()
   })
 
   it('shows tooltip description on hover (structure check)', () => {
-    render(
-      <StatCard
-        label="With Tooltip"
-        value="789"
-        description="This is a description"
-      />
-    )
+    render(<StatCard label="With Tooltip" value="789" description="This is a description" />)
     expect(screen.getByText('This is a description')).toBeTruthy()
   })
 })
