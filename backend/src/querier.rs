@@ -89,7 +89,7 @@ impl MetricsQuerier {
                             match querier.fetch_and_calculate_metrics(&repo_id).await {
                                 Ok(metrics) => {
                                     querier.cache.insert(repo_id.clone(), metrics).await;
-                                    tracing::debug!("Refreshed metrics for {}", repo_id);
+                                    tracing::info!("Refreshed metrics for {}", repo_id);
                                 }
                                 Err(e) => {
                                     tracing::error!(
