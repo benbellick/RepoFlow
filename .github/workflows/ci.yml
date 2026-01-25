@@ -78,5 +78,26 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Docker Build
-        run: docker build .
+      - name: Create dummy .env
+        run: cp .env.example .env
+
+      - name: Build and Start
+        run: docker compose up -d --build
+
+      - name: Wait for service
+        run: |
+          for i in {1..30}; do
+            if curl -s http://localhost:3000 | grep -q "repoflow"; then
+              echo "Service is up and serving UI"
+              exit 0
+            fi
+            echo "Waiting for service... $i/30"
+            sleep 2
+          done
+          echo "Service failed to start or serve UI"
+          docker compose logs
+          exit 1
+
+      - name: Shutdown
+        if: always()
+        run: docker compose down
