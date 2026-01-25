@@ -1,8 +1,9 @@
-node_modules
-target
-dist
-.git
-.env
-.DS_Store
-backend/target
-backend/node_modules
+**/.git
+**/.DS_Store
+**/.env
+**/node_modules
+**/target
+**/dist
+docker-compose.yml
+README.md
+LICENSE
