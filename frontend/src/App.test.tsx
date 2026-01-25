@@ -5,7 +5,8 @@ import * as api from './utils/api'
 
 describe('App', () => {
   it('shows no data message when metrics are empty', async () => {
-    // Mock fetchRepoMetrics to return empty time_series and summary
+    // Mock API calls
+    vi.spyOn(api, 'fetchPopularRepos').mockResolvedValue([])
     const fetchSpy = vi.spyOn(api, 'fetchRepoMetrics').mockResolvedValue({
       time_series: [],
       summary: {

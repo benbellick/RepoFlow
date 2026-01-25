@@ -6,13 +6,16 @@ import { Button } from './components/ui/Button'
 import { FlowChart } from './components/FlowChart'
 import { StatCard } from './components/StatsCards'
 import { About } from './components/About'
+import { PopularRepoChip } from './components/PopularRepoChip'
 import { TrendDirection } from './types'
 import { parseGitHubUrl } from './utils/parser'
 import { fetchRepoMetrics, fetchPopularRepos } from './utils/api'
+import { isSameRepo } from './utils/utils'
 import { Loader2, AlertCircle, Star } from 'lucide-react'
 
 function App(): JSX.Element {
-  const [repoUrl, setRepoUrl] = useState<string>('')
+  const [inputUrl, setInputUrl] = useState<string>('')
+  const [activeRepo, setActiveRepo] = useState<PopularRepo | null>(null)
   const [data, setData] = useState<FlowMetrics[]>([])
   const [summary, setSummary] = useState<SummaryMetrics | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
@@ -27,6 +30,7 @@ function App(): JSX.Element {
       return
     }
 
+    setInputUrl(url)
     setLoading(true)
     setError(null)
 
@@ -34,7 +38,7 @@ function App(): JSX.Element {
       const response = await fetchRepoMetrics(repoDetails.owner, repoDetails.repo)
       setData(response.time_series)
       setSummary(response.summary)
-      setRepoUrl(url)
+      setActiveRepo(repoDetails)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred')
     } finally {
@@ -44,12 +48,12 @@ function App(): JSX.Element {
 
   const handleSearch = (e: FormEvent): void => {
     e.preventDefault()
-    fetchData(repoUrl)
+    fetchData(inputUrl)
   }
 
   const handlePopularClick = useCallback(
-    (owner: string, repo: string): void => {
-      const url = `https://github.com/${owner}/${repo}`
+    (repo: PopularRepo): void => {
+      const url = `https://github.com/${repo.owner}/${repo.repo}`
       fetchData(url)
     },
     [fetchData],
@@ -63,7 +67,7 @@ function App(): JSX.Element {
 
         if (popular.length > 0) {
           const defaultRepo = popular[0]
-          handlePopularClick(defaultRepo.owner, defaultRepo.repo)
+          handlePopularClick(defaultRepo)
         }
       } catch (err) {
         console.error('Failed to load popular repos', err)
@@ -90,8 +94,8 @@ function App(): JSX.Element {
 
         <form onSubmit={handleSearch} className="flex gap-4 w-full md:w-auto">
           <Input
-            value={repoUrl}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => setRepoUrl(e.target.value)}
+            value={inputUrl}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => setInputUrl(e.target.value)}
             placeholder="https://github.com/owner/repo"
             className="flex-grow md:w-96"
           />
@@ -108,14 +112,13 @@ function App(): JSX.Element {
             <h2 className="text-2xl font-black uppercase tracking-tight">Popular Repositories</h2>
           </div>
           <div className="flex flex-wrap gap-3">
-            {popularRepos.map((pr) => (
-              <button
-                key={`${pr.owner}/${pr.repo}`}
-                onClick={() => handlePopularClick(pr.owner, pr.repo)}
-                className="px-4 py-2 border-2 border-black bg-white font-heading hover:bg-main hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-x-[0px] active:translate-y-[0px] active:shadow-none transition-all"
-              >
-                {pr.owner}/{pr.repo}
-              </button>
+            {popularRepos.map((popularRepo) => (
+              <PopularRepoChip
+                key={`${popularRepo.owner}/${popularRepo.repo}`}
+                repo={popularRepo}
+                isActive={isSameRepo(activeRepo, popularRepo)}
+                onClick={handlePopularClick}
+              />
             ))}
             {popularRepos.length === 0 && !loading && (
               <p className="italic text-gray-600">No popular repos loaded.</p>
