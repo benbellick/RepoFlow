@@ -10,6 +10,7 @@ import { PopularRepoChip } from './components/PopularRepoChip'
 import { TrendDirection } from './types'
 import { parseGitHubUrl } from './utils/parser'
 import { fetchRepoMetrics, fetchPopularRepos } from './utils/api'
+import { isSameRepo } from './utils/utils'
 import { Loader2, AlertCircle, Star } from 'lucide-react'
 
 function App(): JSX.Element {
@@ -115,9 +116,7 @@ function App(): JSX.Element {
               <PopularRepoChip
                 key={`${popularRepo.owner}/${popularRepo.repo}`}
                 repo={popularRepo}
-                isActive={
-                  activeRepo?.owner === popularRepo.owner && activeRepo?.repo === popularRepo.repo
-                }
+                isActive={isSameRepo(activeRepo, popularRepo)}
                 onClick={handlePopularClick}
               />
             ))}
