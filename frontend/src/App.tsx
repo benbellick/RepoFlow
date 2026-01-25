@@ -50,8 +50,8 @@ function App(): JSX.Element {
   }
 
   const handlePopularClick = useCallback(
-    (owner: string, repo: string): void => {
-      const url = `https://github.com/${owner}/${repo}`
+    (repo: PopularRepo): void => {
+      const url = `https://github.com/${repo.owner}/${repo.repo}`
       setInputUrl(url)
       fetchData(url)
     },
@@ -66,7 +66,7 @@ function App(): JSX.Element {
 
         if (popular.length > 0) {
           const defaultRepo = popular[0]
-          handlePopularClick(defaultRepo.owner, defaultRepo.repo)
+          handlePopularClick(defaultRepo)
         }
       } catch (err) {
         console.error('Failed to load popular repos', err)
@@ -118,8 +118,7 @@ function App(): JSX.Element {
               return (
                 <PopularRepoChip
                   key={`${pr.owner}/${pr.repo}`}
-                  owner={pr.owner}
-                  repo={pr.repo}
+                  repo={pr}
                   isActive={isActive}
                   onClick={handlePopularClick}
                 />
