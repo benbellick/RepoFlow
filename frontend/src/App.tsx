@@ -13,7 +13,8 @@ import { fetchRepoMetrics, fetchPopularRepos } from './utils/api'
 import { Loader2, AlertCircle, Star } from 'lucide-react'
 
 function App(): JSX.Element {
-  const [repoUrl, setRepoUrl] = useState<string>('')
+  const [inputUrl, setInputUrl] = useState<string>('')
+  const [activeRepo, setActiveRepo] = useState<PopularRepo | null>(null)
   const [data, setData] = useState<FlowMetrics[]>([])
   const [summary, setSummary] = useState<SummaryMetrics | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
@@ -28,7 +29,6 @@ function App(): JSX.Element {
       return
     }
 
-    setRepoUrl(url)
     setLoading(true)
     setError(null)
 
@@ -36,6 +36,7 @@ function App(): JSX.Element {
       const response = await fetchRepoMetrics(repoDetails.owner, repoDetails.repo)
       setData(response.time_series)
       setSummary(response.summary)
+      setActiveRepo({ owner: repoDetails.owner, repo: repoDetails.repo })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred')
     } finally {
@@ -45,12 +46,13 @@ function App(): JSX.Element {
 
   const handleSearch = (e: FormEvent): void => {
     e.preventDefault()
-    fetchData(repoUrl)
+    fetchData(inputUrl)
   }
 
   const handlePopularClick = useCallback(
     (owner: string, repo: string): void => {
       const url = `https://github.com/${owner}/${repo}`
+      setInputUrl(url)
       fetchData(url)
     },
     [fetchData],
@@ -91,8 +93,8 @@ function App(): JSX.Element {
 
         <form onSubmit={handleSearch} className="flex gap-4 w-full md:w-auto">
           <Input
-            value={repoUrl}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => setRepoUrl(e.target.value)}
+            value={inputUrl}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => setInputUrl(e.target.value)}
             placeholder="https://github.com/owner/repo"
             className="flex-grow md:w-96"
           />
@@ -110,8 +112,9 @@ function App(): JSX.Element {
           </div>
           <div className="flex flex-wrap gap-3">
             {popularRepos.map((pr) => {
-              const url = `https://github.com/${pr.owner}/${pr.repo}`
-              const isActive = repoUrl.toLowerCase() === url.toLowerCase()
+              const isActive =
+                activeRepo?.owner.toLowerCase() === pr.owner.toLowerCase() &&
+                activeRepo?.repo.toLowerCase() === pr.repo.toLowerCase()
               return (
                 <PopularRepoChip
                   key={`${pr.owner}/${pr.repo}`}
