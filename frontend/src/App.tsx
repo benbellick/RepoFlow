@@ -30,6 +30,7 @@ function App(): JSX.Element {
       return
     }
 
+    setInputUrl(url)
     setLoading(true)
     setError(null)
 
@@ -53,7 +54,6 @@ function App(): JSX.Element {
   const handlePopularClick = useCallback(
     (repo: PopularRepo): void => {
       const url = `https://github.com/${repo.owner}/${repo.repo}`
-      setInputUrl(url)
       fetchData(url)
     },
     [fetchData],
