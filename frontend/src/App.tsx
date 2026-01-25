@@ -10,6 +10,7 @@ import { PopularRepoChip } from './components/PopularRepoChip'
 import { TrendDirection } from './types'
 import { parseGitHubUrl } from './utils/parser'
 import { fetchRepoMetrics, fetchPopularRepos } from './utils/api'
+import { isSameRepo } from './utils/utils'
 import { Loader2, AlertCircle, Star } from 'lucide-react'
 
 function App(): JSX.Element {
@@ -111,19 +112,14 @@ function App(): JSX.Element {
             <h2 className="text-2xl font-black uppercase tracking-tight">Popular Repositories</h2>
           </div>
           <div className="flex flex-wrap gap-3">
-            {popularRepos.map((pr) => {
-              const isActive =
-                activeRepo?.owner.toLowerCase() === pr.owner.toLowerCase() &&
-                activeRepo?.repo.toLowerCase() === pr.repo.toLowerCase()
-              return (
-                <PopularRepoChip
-                  key={`${pr.owner}/${pr.repo}`}
-                  repo={pr}
-                  isActive={isActive}
-                  onClick={handlePopularClick}
-                />
-              )
-            })}
+            {popularRepos.map((popularRepo) => (
+              <PopularRepoChip
+                key={`${popularRepo.owner}/${popularRepo.repo}`}
+                repo={popularRepo}
+                isActive={isSameRepo(activeRepo, popularRepo)}
+                onClick={handlePopularClick}
+              />
+            ))}
             {popularRepos.length === 0 && !loading && (
               <p className="italic text-gray-600">No popular repos loaded.</p>
             )}
