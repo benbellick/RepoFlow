@@ -36,8 +36,12 @@ describe('StatCard', () => {
   })
 
   it('shows tooltip trigger icon when description is provided', () => {
-    const { container } = render(
-      <StatCard label="With Tooltip" value="789" description="This is a description" />,
+    render(
+      <StatCard
+        label="With Tooltip"
+        value="789"
+        description="This is a description"
+      />
     )
     expect(screen.getByText('This is a description')).toBeTruthy()
     // Check if the Info icon (lucide-react) is rendered.
