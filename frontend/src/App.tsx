@@ -34,7 +34,6 @@ function App(): JSX.Element {
       const response = await fetchRepoMetrics(repoDetails.owner, repoDetails.repo)
       setData(response.time_series)
       setSummary(response.summary)
-      setRepoUrl(url)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred')
     } finally {
@@ -116,10 +115,10 @@ function App(): JSX.Element {
                 <button
                   key={`${pr.owner}/${pr.repo}`}
                   onClick={() => handlePopularClick(pr.owner, pr.repo)}
-                  className={`px-4 py-2 border-2 border-black font-heading transition-all ${
+                  className={`px-4 py-2 border-2 border-black font-heading transition-all active:translate-x-0 active:translate-y-0 active:shadow-none ${
                     isActive
-                      ? 'bg-main translate-x-[-2px] translate-y-[-2px] shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]'
-                      : 'bg-white hover:bg-main hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-x-[0px] active:translate-y-[0px] active:shadow-none'
+                      ? 'bg-main translate-x-[-2px] translate-y-[-2px] shadow-base'
+                      : 'bg-white hover:bg-main hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-base'
                   }`}
                 >
                   {pr.owner}/{pr.repo}
