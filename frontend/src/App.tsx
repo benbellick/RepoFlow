@@ -50,6 +50,7 @@ function App(): JSX.Element {
   const handlePopularClick = useCallback(
     (owner: string, repo: string): void => {
       const url = `https://github.com/${owner}/${repo}`
+      setRepoUrl(url)
       fetchData(url)
     },
     [fetchData],
@@ -108,15 +109,23 @@ function App(): JSX.Element {
             <h2 className="text-2xl font-black uppercase tracking-tight">Popular Repositories</h2>
           </div>
           <div className="flex flex-wrap gap-3">
-            {popularRepos.map((pr) => (
-              <button
-                key={`${pr.owner}/${pr.repo}`}
-                onClick={() => handlePopularClick(pr.owner, pr.repo)}
-                className="px-4 py-2 border-2 border-black bg-white font-heading hover:bg-main hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-x-[0px] active:translate-y-[0px] active:shadow-none transition-all"
-              >
-                {pr.owner}/{pr.repo}
-              </button>
-            ))}
+            {popularRepos.map((pr) => {
+              const url = `https://github.com/${pr.owner}/${pr.repo}`
+              const isActive = repoUrl.toLowerCase() === url.toLowerCase()
+              return (
+                <button
+                  key={`${pr.owner}/${pr.repo}`}
+                  onClick={() => handlePopularClick(pr.owner, pr.repo)}
+                  className={`px-4 py-2 border-2 border-black font-heading transition-all ${
+                    isActive
+                      ? 'bg-main translate-x-[-2px] translate-y-[-2px] shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]'
+                      : 'bg-white hover:bg-main hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-x-[0px] active:translate-y-[0px] active:shadow-none'
+                  }`}
+                >
+                  {pr.owner}/{pr.repo}
+                </button>
+              )
+            })}
             {popularRepos.length === 0 && !loading && (
               <p className="italic text-gray-600">No popular repos loaded.</p>
             )}
