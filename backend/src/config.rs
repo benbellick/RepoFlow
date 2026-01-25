@@ -78,8 +78,8 @@ fn parse_popular_repos(s: &str) -> Vec<RepoId> {
             let parts: Vec<&str> = part.trim().split('/').collect();
             if parts.len() == 2 {
                 Some(RepoId {
-                    owner: parts[0].trim().to_string(),
-                    repo: parts[1].trim().to_string(),
+                    owner: parts[0].trim().to_lowercase(),
+                    repo: parts[1].trim().to_lowercase(),
                 })
             } else {
                 None

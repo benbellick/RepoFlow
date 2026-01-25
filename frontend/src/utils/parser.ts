@@ -23,8 +23,8 @@ export const parseGitHubUrl = (url: string): RepoDetails | null => {
     if (parts.length < 2) return null
 
     return {
-      owner: parts[0],
-      repo: parts[1],
+      owner: parts[0].toLowerCase(),
+      repo: parts[1].toLowerCase(),
     }
   } catch {
     return null
