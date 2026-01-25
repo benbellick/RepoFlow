@@ -6,6 +6,7 @@ import { Button } from './components/ui/Button'
 import { FlowChart } from './components/FlowChart'
 import { StatCard } from './components/StatsCards'
 import { About } from './components/About'
+import { PopularRepoChip } from './components/PopularRepoChip'
 import { TrendDirection } from './types'
 import { parseGitHubUrl } from './utils/parser'
 import { fetchRepoMetrics, fetchPopularRepos } from './utils/api'
@@ -112,17 +113,13 @@ function App(): JSX.Element {
               const url = `https://github.com/${pr.owner}/${pr.repo}`
               const isActive = repoUrl.toLowerCase() === url.toLowerCase()
               return (
-                <button
+                <PopularRepoChip
                   key={`${pr.owner}/${pr.repo}`}
-                  onClick={() => handlePopularClick(pr.owner, pr.repo)}
-                  className={`px-4 py-2 border-2 border-black font-heading transition-all active:translate-x-0 active:translate-y-0 active:shadow-none ${
-                    isActive
-                      ? 'bg-main translate-x-[-2px] translate-y-[-2px] shadow-base'
-                      : 'bg-white hover:bg-main hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-base'
-                  }`}
-                >
-                  {pr.owner}/{pr.repo}
-                </button>
+                  owner={pr.owner}
+                  repo={pr.repo}
+                  isActive={isActive}
+                  onClick={handlePopularClick}
+                />
               )
             })}
             {popularRepos.length === 0 && !loading && (
