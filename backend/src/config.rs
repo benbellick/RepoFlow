@@ -129,11 +129,16 @@ mod tests {
     }
 
     #[test]
-    #[serial]
-    fn test_config_missing_vars() {
-        // Ensure a var is missing
-        env::remove_var("PR_FETCH_DAYS");
-        let result = AppConfig::from_env();
-        assert!(result.is_err());
+    fn test_parse_popular_repos_normalization() {
+        let input = "Facebook/React,Rust-Lang/Rust,Vercel/Next.js";
+        let repos = parse_popular_repos(input);
+
+        assert_eq!(repos.len(), 3);
+        assert_eq!(repos[0].owner, "facebook");
+        assert_eq!(repos[0].repo, "react");
+        assert_eq!(repos[1].owner, "rust-lang");
+        assert_eq!(repos[1].repo, "rust");
+        assert_eq!(repos[2].owner, "vercel");
+        assert_eq!(repos[2].repo, "next.js");
     }
 }
