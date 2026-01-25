@@ -19,4 +19,3 @@ export function isSameRepo(repo1: PopularRepo | null, repo2: PopularRepo | null)
     repo1.repo.toLowerCase() === repo2.repo.toLowerCase()
   )
 }
-

@@ -7,11 +7,7 @@ interface PopularRepoChipProps {
   onClick: (repo: PopularRepo) => void
 }
 
-export const PopularRepoChip = ({
-  repo,
-  isActive,
-  onClick,
-}: PopularRepoChipProps): JSX.Element => {
+export const PopularRepoChip = ({ repo, isActive, onClick }: PopularRepoChipProps): JSX.Element => {
   return (
     <button
       onClick={() => onClick(repo)}
@@ -25,4 +21,3 @@ export const PopularRepoChip = ({
     </button>
   )
 }
-
