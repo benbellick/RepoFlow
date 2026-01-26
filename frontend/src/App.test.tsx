@@ -29,7 +29,7 @@ describe('App', () => {
     fireEvent.click(button)
 
     await waitFor(() => {
-      expect(fetchSpy).toHaveBeenCalledWith('empty', 'repo')
+      expect(fetchSpy).toHaveBeenCalledWith('empty', 'repo', expect.anything())
     })
 
     const noDataMessage = await screen.findByText(/No data found/i)
