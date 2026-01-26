@@ -82,6 +82,15 @@ pub fn calculate_metrics(
     window_size: Duration,
     now: DateTime<Utc>,
 ) -> RepoMetricsResponse {
+    // Pre-sort dates for efficient counting via binary search.
+    // PRs are typically returned from GitHub sorted by created_at DESC,
+    // so an explicit sort here is fast (O(N) for almost-sorted data).
+    let mut opened_dates: Vec<_> = prs.iter().map(|pr| pr.created_at).collect();
+    opened_dates.sort();
+
+    let mut merged_dates: Vec<_> = prs.iter().filter_map(|pr| pr.merged_at).collect();
+    merged_dates.sort();
+
     let time_series: Vec<FlowMetricsResponse> = (0..=days_to_display.num_days())
         .rev()
         .map(|i| {
@@ -98,7 +107,7 @@ pub fn calculate_metrics(
                 )
                 .unwrap();
 
-            calculate_day_metrics(prs, target_date, window_size)
+            calculate_day_metrics(&opened_dates, &merged_dates, target_date, window_size)
         })
         .collect();
 
@@ -136,25 +145,20 @@ fn calculate_summary(time_series: &[FlowMetricsResponse]) -> SummaryMetrics {
 }
 
 /// Calculates opened and merged metrics for a single point in time using a rolling window.
+/// Utilizes binary search on pre-sorted date slices for O(log N) performance per day.
 fn calculate_day_metrics(
-    prs: &[GitHubPR],
+    opened_dates: &[DateTime<Utc>],
+    merged_dates: &[DateTime<Utc>],
     target_date: DateTime<Utc>,
     window_size: Duration,
 ) -> FlowMetricsResponse {
     let window_start = target_date - window_size;
 
-    let opened = prs
-        .iter()
-        .filter(|pr| pr.created_at >= window_start && pr.created_at <= target_date)
-        .count();
+    let opened = opened_dates.partition_point(|&d| d <= target_date)
+        - opened_dates.partition_point(|&d| d < window_start);
 
-    let merged = prs
-        .iter()
-        .filter(|pr| {
-            pr.merged_at
-                .is_some_and(|merged_at| merged_at >= window_start && merged_at <= target_date)
-        })
-        .count();
+    let merged = merged_dates.partition_point(|&d| d <= target_date)
+        - merged_dates.partition_point(|&d| d < window_start);
 
     FlowMetricsResponse {
         date: target_date.format("%Y-%m-%d").to_string(),

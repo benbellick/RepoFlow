@@ -10,7 +10,6 @@
 use crate::config::{AppConfig, RepoId};
 use crate::metrics::{self, GitHubPR, PRState, RepoMetricsResponse};
 use chrono::{Duration, Utc};
-use futures::future::join_all;
 use futures::stream::{self, StreamExt};
 use moka::future::Cache;
 use octocrab::models::pulls::PullRequest;
@@ -140,13 +139,12 @@ impl MetricsQuerier {
         let mut prs = Vec::new();
         let mut hit_page_limit = true;
 
-        // Fetch pages concurrently in batches to improve performance.
-        const BATCH_SIZE: u32 = 5;
+        // Use a buffered stream to maintain multiple concurrent requests to GitHub.
+        // This significantly reduces latency compared to sequential or small-batch fetching.
+        const CONCURRENCY_LIMIT: usize = 15;
 
-        'outer: for batch_start in (1..=max_pages).step_by(BATCH_SIZE as usize) {
-            let batch_end = (batch_start + BATCH_SIZE - 1).min(max_pages);
-
-            let futures = (batch_start..=batch_end).map(|page_num| {
+        let mut page_stream = stream::iter(1..=max_pages)
+            .map(|page_num| {
                 let octocrab = self.octocrab.clone();
                 let owner = repo_id.owner.clone();
                 let repo = repo_id.repo.clone();
@@ -162,24 +160,22 @@ impl MetricsQuerier {
                         .send()
                         .await
                 }
-            });
+            })
+            .buffered(CONCURRENCY_LIMIT);
 
-            let results = join_all(futures).await;
+        while let Some(result) = page_stream.next().await {
+            let page = result?;
+            if page.items.is_empty() {
+                hit_page_limit = false;
+                break;
+            }
 
-            for result in results {
-                let page = result?;
-                if page.items.is_empty() {
-                    hit_page_limit = false;
-                    break 'outer;
-                }
+            let page_prs = self.process_pr_page(&page);
+            prs.extend(page_prs);
 
-                let page_prs = self.process_pr_page(&page);
-                prs.extend(page_prs);
-
-                if prs.last().is_some_and(|pr| pr.created_at < cutoff_date) {
-                    hit_page_limit = false;
-                    break 'outer;
-                }
+            if prs.last().is_some_and(|pr| pr.created_at < cutoff_date) {
+                hit_page_limit = false;
+                break;
             }
         }
 
