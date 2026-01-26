@@ -149,20 +149,32 @@ impl MetricsQuerier {
             .send()
             .await?;
 
+        let mut hit_page_limit = true;
+
         for _ in 1..=max_pages {
             let page_prs = self.process_pr_page(&current_page);
             prs.extend(page_prs);
 
             // If the last PR we just added is older than the cutoff, we can stop.
             if prs.last().is_some_and(|pr| pr.created_at < cutoff_date) {
+                hit_page_limit = false;
                 break;
             }
 
             if let Some(next_page) = self.octocrab.get_page(&current_page.next).await? {
                 current_page = next_page;
             } else {
+                hit_page_limit = false;
                 break;
             }
+        }
+
+        if hit_page_limit {
+            tracing::warn!(
+                "Hit max_github_api_pages ({}) for repo {} before reaching cutoff date. Data may be incomplete.",
+                max_pages,
+                repo_id
+            );
         }
 
         // Clean up: remove any PRs that were in the last page but beyond the cutoff.
