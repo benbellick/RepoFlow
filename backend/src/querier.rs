@@ -80,7 +80,10 @@ impl MetricsQuerier {
                 tracing::info!("Refreshing popular repositories...");
 
                 stream::iter(&config.popular_repos)
-                    .for_each_concurrent(None, |repo_id| querier.refresh_repo(repo_id))
+                    .for_each_concurrent(
+                        Some(config.popular_repos_concurrency_limit),
+                        |repo_id| querier.refresh_repo(repo_id),
+                    )
                     .await;
 
                 tracing::info!("Finished refreshing popular repositories");

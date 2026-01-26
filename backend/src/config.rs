@@ -50,8 +50,17 @@ pub struct AppConfig {
     #[serde(deserialize_with = "deserialize_popular_repos")]
     pub popular_repos: Vec<RepoId>,
 
+    /// Maximum number of concurrent requests for refreshing popular repositories.
+    /// Defaults to 10 if not specified.
+    #[serde(default = "default_concurrency_limit")]
+    pub popular_repos_concurrency_limit: usize,
+
     /// Optional GitHub Personal Access Token for higher rate limits.
     pub github_token: Option<String>,
+}
+
+fn default_concurrency_limit() -> usize {
+    10
 }
 
 impl AppConfig {
@@ -105,6 +114,7 @@ mod tests {
         env::set_var("CACHE_TTL_SECONDS", "3600");
         env::set_var("CACHE_MAX_CAPACITY", "500");
         env::set_var("POPULAR_REPOS", "owner1/repo1,owner2/repo2");
+        env::set_var("POPULAR_REPOS_CONCURRENCY_LIMIT", "5");
 
         let config = AppConfig::from_env().expect("Failed to load config");
 
@@ -117,6 +127,7 @@ mod tests {
         assert_eq!(config.popular_repos.len(), 2);
         assert_eq!(config.popular_repos[0].owner, "owner1");
         assert_eq!(config.popular_repos[0].repo, "repo1");
+        assert_eq!(config.popular_repos_concurrency_limit, 5);
 
         // Clean up
         env::remove_var("PR_FETCH_DAYS");
@@ -126,6 +137,7 @@ mod tests {
         env::remove_var("CACHE_TTL_SECONDS");
         env::remove_var("CACHE_MAX_CAPACITY");
         env::remove_var("POPULAR_REPOS");
+        env::remove_var("POPULAR_REPOS_CONCURRENCY_LIMIT");
     }
 
     #[test]
