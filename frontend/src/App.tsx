@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import type { JSX, ChangeEvent, FormEvent } from 'react'
 import type { FlowMetrics, SummaryMetrics, PopularRepo } from './types'
 import { Input } from './components/ui/Input'
@@ -23,6 +23,8 @@ function App(): JSX.Element {
   const [popularRepos, setPopularRepos] = useState<PopularRepo[]>([])
   const [isAboutOpen, setIsAboutOpen] = useState<boolean>(false)
 
+  const abortControllerRef = useRef<AbortController | null>(null)
+
   const fetchData = useCallback(async (url: string): Promise<void> => {
     const repoDetails = parseGitHubUrl(url)
     if (!repoDetails) {
@@ -30,19 +32,38 @@ function App(): JSX.Element {
       return
     }
 
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+
     setInputUrl(url)
     setLoading(true)
     setError(null)
 
     try {
-      const response = await fetchRepoMetrics(repoDetails.owner, repoDetails.repo)
+      const response = await fetchRepoMetrics(
+        repoDetails.owner,
+        repoDetails.repo,
+        controller.signal,
+      )
       setData(response.time_series)
       setSummary(response.summary)
       setActiveRepo(repoDetails)
     } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        console.log('Request aborted')
+        return
+      }
       setError(err instanceof Error ? err.message : 'An unknown error occurred')
     } finally {
-      setLoading(false)
+      // Only turn off loading if this is the current request
+      if (abortControllerRef.current === controller) {
+        setLoading(false)
+        abortControllerRef.current = null
+      }
     }
   }, [])
 
