@@ -137,32 +137,54 @@ impl MetricsQuerier {
     ) -> anyhow::Result<Vec<GitHubPR>> {
         let cutoff_date = Utc::now() - chrono::Duration::days(days);
         let mut prs = Vec::new();
+        let mut hit_page_limit = true;
 
-        let mut current_page = self
-            .octocrab
-            .pulls(&repo_id.owner, &repo_id.repo)
-            .list()
-            .state(octocrab::params::State::All)
-            .sort(octocrab::params::pulls::Sort::Created)
-            .direction(octocrab::params::Direction::Descending)
-            .per_page(100)
-            .send()
-            .await?;
+        // Use a buffered stream to maintain multiple concurrent requests to GitHub.
+        // This significantly reduces latency compared to sequential or small-batch fetching.
+        const CONCURRENCY_LIMIT: usize = 15;
 
-        for _ in 1..=max_pages {
-            let page_prs = self.process_pr_page(&current_page);
+        let mut page_stream = stream::iter(1..=max_pages)
+            .map(|page_num| {
+                let octocrab = self.octocrab.clone();
+                let owner = repo_id.owner.clone();
+                let repo = repo_id.repo.clone();
+                async move {
+                    octocrab
+                        .pulls(owner, repo)
+                        .list()
+                        .state(octocrab::params::State::All)
+                        .sort(octocrab::params::pulls::Sort::Created)
+                        .direction(octocrab::params::Direction::Descending)
+                        .per_page(100)
+                        .page(page_num)
+                        .send()
+                        .await
+                }
+            })
+            .buffered(CONCURRENCY_LIMIT);
+
+        while let Some(result) = page_stream.next().await {
+            let page = result?;
+            if page.items.is_empty() {
+                hit_page_limit = false;
+                break;
+            }
+
+            let page_prs = self.process_pr_page(&page);
             prs.extend(page_prs);
 
-            // If the last PR we just added is older than the cutoff, we can stop.
             if prs.last().is_some_and(|pr| pr.created_at < cutoff_date) {
+                hit_page_limit = false;
                 break;
             }
+        }
 
-            if let Some(next_page) = self.octocrab.get_page(&current_page.next).await? {
-                current_page = next_page;
-            } else {
-                break;
-            }
+        if hit_page_limit {
+            tracing::warn!(
+                "Hit max_github_api_pages ({}) for repo {} before reaching cutoff date. Data may be incomplete.",
+                max_pages,
+                repo_id
+            );
         }
 
         // Clean up: remove any PRs that were in the last page but beyond the cutoff.
