@@ -82,7 +82,7 @@ impl MetricsQuerier {
                 let tasks: Vec<_> = config
                     .popular_repos
                     .iter()
-                    .map(|repo_id| querier.refresh_repo(repo_id.clone()))
+                    .map(|repo_id| querier.refresh_repo(repo_id))
                     .collect();
 
                 join_all(tasks).await;
@@ -91,9 +91,11 @@ impl MetricsQuerier {
         });
     }
 
-    /// Refreshes metrics for a single repository.
-    async fn refresh_repo(&self, repo_id: RepoId) {
-        match self.fetch_and_calculate_metrics(&repo_id).await {
+    /// Refreshes metrics for a single repository and updates the cache.
+    ///
+    /// This is used by the background task to keep popular repositories' metrics warm.
+    async fn refresh_repo(&self, repo_id: &RepoId) {
+        match self.fetch_and_calculate_metrics(repo_id).await {
             Ok(metrics) => {
                 self.cache.insert(repo_id.clone(), metrics).await;
                 tracing::info!("Refreshed metrics for {}", repo_id);
