@@ -82,31 +82,26 @@ impl MetricsQuerier {
                 let tasks: Vec<_> = config
                     .popular_repos
                     .iter()
-                    .map(|repo_id| {
-                        let querier = querier.clone();
-                        let repo_id = repo_id.clone();
-                        async move {
-                            match querier.fetch_and_calculate_metrics(&repo_id).await {
-                                Ok(metrics) => {
-                                    querier.cache.insert(repo_id.clone(), metrics).await;
-                                    tracing::info!("Refreshed metrics for {}", repo_id);
-                                }
-                                Err(e) => {
-                                    tracing::error!(
-                                        "Failed to refresh popular repo {}: {}",
-                                        repo_id,
-                                        e
-                                    );
-                                }
-                            }
-                        }
-                    })
+                    .map(|repo_id| querier.refresh_repo(repo_id.clone()))
                     .collect();
 
                 join_all(tasks).await;
                 tracing::info!("Finished refreshing popular repositories");
             }
         });
+    }
+
+    /// Refreshes metrics for a single repository.
+    async fn refresh_repo(&self, repo_id: RepoId) {
+        match self.fetch_and_calculate_metrics(&repo_id).await {
+            Ok(metrics) => {
+                self.cache.insert(repo_id.clone(), metrics).await;
+                tracing::info!("Refreshed metrics for {}", repo_id);
+            }
+            Err(e) => {
+                tracing::error!("Failed to refresh popular repo {}: {}", repo_id, e);
+            }
+        }
     }
 
     /// Fetches PRs from GitHub and calculates flow metrics.
