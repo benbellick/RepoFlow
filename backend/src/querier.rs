@@ -10,7 +10,7 @@
 use crate::config::{AppConfig, RepoId};
 use crate::metrics::{self, GitHubPR, PRState, RepoMetricsResponse};
 use chrono::{Duration, Utc};
-use futures::future::join_all;
+use futures::stream::{self, StreamExt};
 use moka::future::Cache;
 use octocrab::models::pulls::PullRequest;
 use octocrab::{Octocrab, Page};
@@ -79,13 +79,10 @@ impl MetricsQuerier {
                 interval.tick().await;
                 tracing::info!("Refreshing popular repositories...");
 
-                let tasks: Vec<_> = config
-                    .popular_repos
-                    .iter()
-                    .map(|repo_id| querier.refresh_repo(repo_id))
-                    .collect();
+                stream::iter(&config.popular_repos)
+                    .for_each_concurrent(None, |repo_id| querier.refresh_repo(repo_id))
+                    .await;
 
-                join_all(tasks).await;
                 tracing::info!("Finished refreshing popular repositories");
             }
         });
