@@ -10,6 +10,7 @@
 use crate::config::{AppConfig, RepoId};
 use crate::metrics::{self, GitHubPR, PRState, RepoMetricsResponse};
 use chrono::{Duration, Utc};
+use futures::future::join_all;
 use futures::stream::{self, StreamExt};
 use moka::future::Cache;
 use octocrab::models::pulls::PullRequest;
@@ -137,32 +138,57 @@ impl MetricsQuerier {
     ) -> anyhow::Result<Vec<GitHubPR>> {
         let cutoff_date = Utc::now() - chrono::Duration::days(days);
         let mut prs = Vec::new();
+        let mut hit_page_limit = true;
 
-        let mut current_page = self
-            .octocrab
-            .pulls(&repo_id.owner, &repo_id.repo)
-            .list()
-            .state(octocrab::params::State::All)
-            .sort(octocrab::params::pulls::Sort::Created)
-            .direction(octocrab::params::Direction::Descending)
-            .per_page(100)
-            .send()
-            .await?;
+        // Fetch pages concurrently in batches to improve performance.
+        const BATCH_SIZE: u32 = 5;
 
-        for _ in 1..=max_pages {
-            let page_prs = self.process_pr_page(&current_page);
-            prs.extend(page_prs);
+        'outer: for batch_start in (1..=max_pages).step_by(BATCH_SIZE as usize) {
+            let batch_end = (batch_start + BATCH_SIZE - 1).min(max_pages);
 
-            // If the last PR we just added is older than the cutoff, we can stop.
-            if prs.last().is_some_and(|pr| pr.created_at < cutoff_date) {
-                break;
+            let futures = (batch_start..=batch_end).map(|page_num| {
+                let octocrab = self.octocrab.clone();
+                let owner = repo_id.owner.clone();
+                let repo = repo_id.repo.clone();
+                async move {
+                    octocrab
+                        .pulls(owner, repo)
+                        .list()
+                        .state(octocrab::params::State::All)
+                        .sort(octocrab::params::pulls::Sort::Created)
+                        .direction(octocrab::params::Direction::Descending)
+                        .per_page(100)
+                        .page(page_num)
+                        .send()
+                        .await
+                }
+            });
+
+            let results = join_all(futures).await;
+
+            for result in results {
+                let page = result?;
+                if page.items.is_empty() {
+                    hit_page_limit = false;
+                    break 'outer;
+                }
+
+                let page_prs = self.process_pr_page(&page);
+                prs.extend(page_prs);
+
+                if prs.last().is_some_and(|pr| pr.created_at < cutoff_date) {
+                    hit_page_limit = false;
+                    break 'outer;
+                }
             }
+        }
 
-            if let Some(next_page) = self.octocrab.get_page(&current_page.next).await? {
-                current_page = next_page;
-            } else {
-                break;
-            }
+        if hit_page_limit {
+            tracing::warn!(
+                "Hit max_github_api_pages ({}) for repo {} before reaching cutoff date. Data may be incomplete.",
+                max_pages,
+                repo_id
+            );
         }
 
         // Clean up: remove any PRs that were in the last page but beyond the cutoff.
