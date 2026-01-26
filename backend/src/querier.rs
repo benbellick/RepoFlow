@@ -10,6 +10,7 @@
 use crate::config::{AppConfig, RepoId};
 use crate::metrics::{self, GitHubPR, PRState, RepoMetricsResponse};
 use chrono::{Duration, Utc};
+use futures::stream::{self, StreamExt};
 use moka::future::Cache;
 use octocrab::models::pulls::PullRequest;
 use octocrab::{Octocrab, Page};
@@ -69,20 +70,39 @@ impl MetricsQuerier {
         let config = self.config.clone();
 
         tokio::spawn(async move {
+            tracing::info!("Starting background refresh task for popular repositories");
             // Refresh popular repos at half their TTL to ensure they are always fresh/warm.
             let mut interval =
                 tokio::time::interval(StdDuration::from_secs(config.cache_ttl_seconds / 2));
 
             loop {
                 interval.tick().await;
+                tracing::info!("Refreshing popular repositories...");
 
-                for repo_id in &config.popular_repos {
-                    if let Ok(metrics) = querier.fetch_and_calculate_metrics(repo_id).await {
-                        querier.cache.insert(repo_id.clone(), metrics).await;
-                    }
-                }
+                stream::iter(&config.popular_repos)
+                    .for_each_concurrent(Some(config.popular_repos_concurrency_limit), |repo_id| {
+                        querier.refresh_repo(repo_id)
+                    })
+                    .await;
+
+                tracing::info!("Finished refreshing popular repositories");
             }
         });
+    }
+
+    /// Refreshes metrics for a single repository and updates the cache.
+    ///
+    /// This is used by the background task to keep popular repositories' metrics warm.
+    async fn refresh_repo(&self, repo_id: &RepoId) {
+        match self.fetch_and_calculate_metrics(repo_id).await {
+            Ok(metrics) => {
+                self.cache.insert(repo_id.clone(), metrics).await;
+                tracing::info!("Refreshed metrics for {}", repo_id);
+            }
+            Err(e) => {
+                tracing::error!("Failed to refresh popular repo {}: {}", repo_id, e);
+            }
+        }
     }
 
     /// Fetches PRs from GitHub and calculates flow metrics.
